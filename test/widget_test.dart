@@ -1,30 +1,56 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
 
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:controle_financeiro_android/main.dart';
+import 'package:controle_financeiro_android/app/app.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  setUp(() {
+    // Cria um armazenamento vazio para cada teste.
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  testWidgets('Exibe as quatro abas principais', (tester) async {
+    await tester.pumpWidget(const ControleFinanceiroApp());
+    await tester.pumpAndSettle();
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    expect(find.text('Início'), findsOneWidget);
+    expect(find.text('Lançamentos'), findsOneWidget);
+    expect(find.text('Cartões'), findsOneWidget);
+    expect(find.text('Mais'), findsOneWidget);
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('Permite navegar entre as abas', (tester) async {
+    await tester.pumpWidget(const ControleFinanceiroApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Lançamentos'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Lançamentos em desenvolvimento'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Cartões'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Cartões em desenvolvimento'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Exibe as opções de tema', (tester) async {
+    await tester.pumpWidget(const ControleFinanceiroApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Selecionar tema'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Claro'), findsOneWidget);
+    expect(find.text('Escuro'), findsOneWidget);
+    expect(find.text('Sistema'), findsOneWidget);
   });
 }
