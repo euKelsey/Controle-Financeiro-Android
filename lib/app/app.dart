@@ -1,6 +1,7 @@
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../theme/app_theme.dart';
 
 import '../screens/home_screen.dart';
 
@@ -8,15 +9,11 @@ class ControleFinanceiroApp extends StatefulWidget {
   const ControleFinanceiroApp({super.key});
 
   @override
-  State<ControleFinanceiroApp> createState() =>
-      _ControleFinanceiroAppState();
+  State<ControleFinanceiroApp> createState() => _ControleFinanceiroAppState();
 }
 
-class _ControleFinanceiroAppState
-    extends State<ControleFinanceiroApp> {
-
-  final SharedPreferencesAsync _preferencias =
-      SharedPreferencesAsync();
+class _ControleFinanceiroAppState extends State<ControleFinanceiroApp> {
+  final SharedPreferencesAsync _preferencias = SharedPreferencesAsync();
 
   static const String _chaveTema = 'tema_aplicativo';
 
@@ -30,8 +27,7 @@ class _ControleFinanceiroAppState
 
   Future<void> _carregarTema() async {
     try {
-      final temaSalvo =
-          await _preferencias.getString(_chaveTema);
+      final temaSalvo = await _preferencias.getString(_chaveTema);
 
       if (!mounted) return;
 
@@ -71,28 +67,12 @@ class _ControleFinanceiroAppState
       title: 'Controle Financeiro',
       debugShowCheckedModeBanner: false,
 
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.teal,
-          brightness: Brightness.light,
-        ),
-      ),
-
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.teal,
-          brightness: Brightness.dark,
-        ),
-      ),
+      theme: AppTheme.temaClaro,
+      darkTheme: AppTheme.temaEscuro,
 
       themeMode: _temaAtual,
 
-      home: HomeScreen(
-        temaAtual: _temaAtual,
-        onTemaAlterado: _alterarTema,
-      ),
+      home: HomeScreen(temaAtual: _temaAtual, onTemaAlterado: _alterarTema),
     );
   }
 }

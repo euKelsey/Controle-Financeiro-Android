@@ -134,4 +134,145 @@ class LancamentoRepository {
     );
   }
 
+
+  // Calcula receitas, despesas e saldo previsto
+  // de um determinado mês.
+  Future<({
+    int receitas,
+    int despesas,
+    int saldoPrevisto,
+  })> obterResumoMensal({
+    required int ano,
+    required int mes,
+  }) async {
+    // REGRA 1: Validar o período informado.
+    if (ano < 1 || ano > 9999) {
+      throw ArgumentError('Ano inválido.');
+    }
+
+    if (mes < 1 || mes > 12) {
+      throw ArgumentError('Mês inválido.');
+    }
+
+    final db = await _obterBanco();
+
+    // REGRA 2: Definir o intervalo do mês.
+    final inicio =
+        '${ano.toString().padLeft(4, '0')}-'
+        '${mes.toString().padLeft(2, '0')}-01';
+
+    final proximoMes = DateTime.utc(ano, mes + 1);
+
+    final fim =
+        '${proximoMes.year.toString().padLeft(4, '0')}-'
+        '${proximoMes.month.toString().padLeft(2, '0')}-01';
+
+    // REGRA 3: Somar os lançamentos do período.
+    final resultado = await db.rawQuery(
+      '''
+      SELECT
+        COALESCE(
+          SUM(
+            CASE
+              WHEN tipo = 'RECEITA'
+              THEN valor_previsto
+              ELSE 0
+            END
+          ),
+          0
+        ) AS receitas,
+
+        COALESCE(
+          SUM(
+            CASE
+              WHEN tipo = 'DESPESA'
+              THEN valor_previsto
+              ELSE 0
+            END
+          ),
+          0
+        ) AS despesas
+
+      FROM lancamento
+
+      WHERE data_prevista >= ?
+        AND data_prevista < ?
+        AND status IN ('PENDENTE', 'EFETIVADO')
+      ''',
+      [inicio, fim],
+    );
+
+    // REGRA 4: Converter os resultados.
+    final receitas = resultado.first['receitas'] as int;
+    final despesas = resultado.first['despesas'] as int;
+
+    // REGRA 5: Calcular o saldo previsto.
+    final saldoPrevisto = receitas - despesas;
+
+    return (
+      receitas: receitas,
+      despesas: despesas,
+      saldoPrevisto: saldoPrevisto,
+    );
+  }
+
+
+  // Consulta os proximos lancamentos pendentes,
+  // ordenados pela data de vencimento.
+  Future<List<LancamentoModel>> listarProximosVencimentos({
+    required String dataReferencia,
+    int limite = 5,
+  }) async {
+    // REGRA 1: Validar a data de referencia.
+    final formato = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+
+    if (!formato.hasMatch(dataReferencia)) {
+      throw ArgumentError(
+        'A data deve estar no formato AAAA-MM-DD.',
+      );
+    }
+
+    final data = DateTime.tryParse(dataReferencia);
+
+    if (data == null ||
+        data.year.toString().padLeft(4, '0') !=
+            dataReferencia.substring(0, 4) ||
+        data.month.toString().padLeft(2, '0') !=
+            dataReferencia.substring(5, 7) ||
+        data.day.toString().padLeft(2, '0') !=
+            dataReferencia.substring(8, 10)) {
+      throw ArgumentError(
+        'Data de referencia invalida.',
+      );
+    }
+
+    // REGRA 2: Validar a quantidade solicitada.
+    if (limite < 1 || limite > 50) {
+      throw ArgumentError(
+        'O limite deve estar entre 1 e 50.',
+      );
+    }
+
+    final db = await _obterBanco();
+
+    // REGRA 3: Consultar apenas lancamentos
+    // pendentes a partir da data informada.
+    final registros = await db.query(
+      'lancamento',
+      where: 'status = ? AND data_prevista >= ?',
+      whereArgs: [
+        'PENDENTE',
+        dataReferencia,
+      ],
+      orderBy: 'data_prevista ASC, id ASC',
+      limit: limite,
+    );
+
+    // REGRA 4: Converter os registros
+    // do SQLite para objetos Dart.
+    return registros
+        .map((registro) => LancamentoModel.fromMap(registro))
+        .toList();
+  }
+
 }
