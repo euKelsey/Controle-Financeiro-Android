@@ -87,6 +87,7 @@ class LancamentoService {
     required String dataPrevista,
     required int? categoriaId,
     String? observacao,
+    bool registroDireto = false,
   }) async {
     // Padroniza os dados recebidos.
     tipo = tipo.trim().toUpperCase();
@@ -125,7 +126,7 @@ class LancamentoService {
     );
 
     // Envia ao Repository para gravar no SQLite.
-    return _repository.inserir(lancamento);
+    return registroDireto ? _repository.inserirEfetivado(lancamento) : _repository.inserir(lancamento);
   }
 
   // Lista todos os lançamentos financeiros.
@@ -173,6 +174,7 @@ class LancamentoService {
     required int? categoriaId,
     String status = 'PENDENTE',
     String? observacao,
+    bool registroDireto = false,
   }) async {
     // Verifica se o lançamento existe.
     final existente = await buscarLancamentoPorId(lancamentoId);
@@ -185,7 +187,7 @@ class LancamentoService {
     }
 
     // Impede edição de lançamentos já finalizados.
-    if (existente.status != 'PENDENTE') {
+    if (existente.status != 'PENDENTE' && !(registroDireto && existente.origem == 'MANUAL' && existente.status == 'EFETIVADO')) {
       throw ArgumentError('Somente lançamentos pendentes podem ser editados.');
     }
 
@@ -252,17 +254,19 @@ class LancamentoService {
       origem: existente.origem,
     );
 
-    final linhas = await _repository.atualizar(atualizado);
+    final linhas = registroDireto && existente.origem == 'MANUAL'
+        ? await _repository.atualizarRegistrado(atualizado)
+        : await _repository.atualizar(atualizado);
 
     if (linhas == 0) {
       throw StateError('Não foi possível atualizar o lançamento.');
     }
 
-    return atualizado;
+    return registroDireto ? buscarLancamentoPorId(lancamentoId) : atualizado;
   }
 
   // Cancela um lançamento sem excluir seu registro.
-  Future<LancamentoModel> cancelarLancamento(int lancamentoId) async {
+  Future<LancamentoModel> cancelarLancamento(int lancamentoId, {bool registroDireto = false}) async {
     final existente = await buscarLancamentoPorId(lancamentoId);
 
     // Faturas possuem um fluxo próprio de gerenciamento.
@@ -279,7 +283,9 @@ class LancamentoService {
       );
     }
 
-    final linhas = await _repository.cancelar(lancamentoId);
+    final linhas = registroDireto && existente.origem == 'MANUAL'
+        ? await _repository.cancelarRegistrado(lancamentoId)
+        : await _repository.cancelar(lancamentoId);
 
     if (linhas == 0) {
       throw StateError('Não foi possível cancelar o lançamento.');
