@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/cartao_model.dart';
+import '../models/compra_cartao_model.dart';
 import '../models/categoria_model.dart';
 import '../services/compra_cartao_service.dart';
 
 class CompraCartaoFormScreen extends StatefulWidget {
   final CompraCartaoService service;
-  const CompraCartaoFormScreen({super.key, required this.service});
+  final CompraCartaoModel? compra;
+  const CompraCartaoFormScreen({super.key, required this.service, this.compra});
 
   @override
   State<CompraCartaoFormScreen> createState() => _CompraCartaoFormScreenState();
@@ -30,8 +32,17 @@ class _CompraCartaoFormScreenState extends State<CompraCartaoFormScreen> {
     final hoje = DateTime.now();
     _data.text = '${hoje.day.toString().padLeft(2, '0')}/'
         '${hoje.month.toString().padLeft(2, '0')}/${hoje.year.toString().padLeft(4, '0')}';
-    _cartoes = widget.service.listarCartoesAtivos();
-    _categorias = widget.service.listarCategoriasDespesa();
+    final compra = widget.compra;
+    if (compra != null) {
+      _cartaoId = compra.cartaoId;
+      _categoriaId = compra.categoriaId;
+      _descricao.text = compra.descricao;
+      _valor.text = '${compra.valorTotal ~/ 100},${(compra.valorTotal % 100).toString().padLeft(2, '0')}';
+      _data.text = compra.dataCompra.split('-').reversed.join('/');
+      _observacao.text = compra.observacao ?? '';
+    }
+    _cartoes = widget.service.listarCartoesFormulario(cartaoAtualId: compra?.cartaoId);
+    _categorias = widget.service.listarCategoriasFormulario(categoriaAtualId: compra?.categoriaId);
   }
 
   int? _centavos(String texto) {
@@ -68,7 +79,17 @@ class _CompraCartaoFormScreenState extends State<CompraCartaoFormScreen> {
     }
     setState(() => _salvando = true);
     try {
-      await widget.service.cadastrarCompra(
+      if (widget.compra != null) {
+        await widget.service.atualizarCompra(
+          compraId: widget.compra!.id!,
+          categoriaId: _categoriaId!,
+          descricao: _descricao.text,
+          dataCompra: _iso(_data.text)!,
+          valorTotal: _centavos(_valor.text)!,
+          observacao: _observacao.text.trim(),
+        );
+      } else {
+        await widget.service.cadastrarCompra(
         cartaoId: _cartaoId!,
         categoriaId: _categoriaId!,
         descricao: _descricao.text,
@@ -76,6 +97,7 @@ class _CompraCartaoFormScreenState extends State<CompraCartaoFormScreen> {
         valorTotal: _centavos(_valor.text)!,
         observacao: _observacao.text.trim(),
       );
+      }
       if (mounted) Navigator.of(context).pop(true);
     } catch (erro) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
@@ -98,7 +120,7 @@ class _CompraCartaoFormScreenState extends State<CompraCartaoFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Nova compra no cartão')),
+      appBar: AppBar(title: Text(widget.compra == null ? 'Nova compra no cartão' : 'Editar compra')),
       body: Form(
         key: _form,
         child: ListView(
@@ -120,7 +142,7 @@ class _CompraCartaoFormScreenState extends State<CompraCartaoFormScreen> {
                   decoration: const InputDecoration(labelText: 'Cartão'),
                   items: [for (final c in lista)
                     DropdownMenuItem(value: c.id!, child: Text(c.nome))],
-                  onChanged: _salvando ? null : (v) => setState(() => _cartaoId = v),
+                  onChanged: _salvando || widget.compra != null ? null : (v) => setState(() => _cartaoId = v),
                   validator: (v) => v == null ? 'Selecione o cartão.' : null,
                 );
               },
