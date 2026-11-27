@@ -199,7 +199,7 @@ class _LancamentoFormScreenState extends State<LancamentoFormScreen> {
             TextFormField(
               controller: _valor,
               decoration: const InputDecoration(
-                labelText: 'Valor (R$)',
+                labelText: 'Valor (R\$)',
                 hintText: 'Ex.: 125,90',
               ),
               keyboardType: const TextInputType.numberWithOptions(
