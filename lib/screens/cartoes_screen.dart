@@ -15,6 +15,7 @@ import '../repositories/categoria_repository.dart';
 import '../services/compra_cartao_service.dart';
 
 class CartoesScreen extends StatefulWidget {
+  final int revisaoDados;
   final CartaoService? cartaoService;
   final FaturaService? faturaService;
   final FaturaRepository? faturaRepository;
@@ -22,6 +23,7 @@ class CartoesScreen extends StatefulWidget {
 
   const CartoesScreen({
     super.key,
+    this.revisaoDados = 0,
     this.cartaoService,
     this.faturaService,
     this.faturaRepository,
@@ -33,6 +35,14 @@ class CartoesScreen extends StatefulWidget {
 }
 
 class _CartoesScreenState extends State<CartoesScreen> {
+  @override
+  void didUpdateWidget(covariant CartoesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.revisaoDados != widget.revisaoDados) {
+      _atualizar();
+    }
+  }
+
   late final CartaoService _cartaoService;
   late final CompraCartaoService _compraService;
   late final FaturaService _faturaService;
