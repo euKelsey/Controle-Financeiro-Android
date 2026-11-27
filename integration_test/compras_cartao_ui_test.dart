@@ -14,6 +14,7 @@ import 'package:controle_financeiro_android/screens/cartoes_screen.dart';
 import 'package:controle_financeiro_android/services/cartao_service.dart';
 import 'package:controle_financeiro_android/services/compra_cartao_service.dart';
 import 'package:controle_financeiro_android/services/fatura_service.dart';
+import 'package:controle_financeiro_android/services/dashboard_service.dart';
 import 'package:controle_financeiro_android/theme/app_theme.dart';
 
 void main() {
@@ -99,7 +100,15 @@ void main() {
       await tester.pumpAndSettle();
       await tester.enterText(find.byKey(const ValueKey('compra-descricao')), 'Compra UI teste');
       await tester.enterText(find.byKey(const ValueKey('compra-valor')), '125,90');
-      await tester.enterText(find.byKey(const ValueKey('compra-data')), '02/$mes/$ano');
+      await tester.ensureVisible(find.byKey(const ValueKey('compra-data')));
+      await tester.tap(find.byKey(const ValueKey('compra-data')));
+      await tester.pumpAndSettle();
+      expect(find.byType(DatePickerDialog), findsOneWidget);
+      await tester.tap(find.byTooltip('Next month'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('2').last);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Salvar compra'));
       await tester.tap(find.text('Salvar compra'));
       await tester.pumpAndSettle();
@@ -170,6 +179,12 @@ void main() {
         categoriaId: categoriaId, descricao: 'Compra UI teste',
         dataCompra: iso, valorTotal: 100000);
       expect((await db.query('fatura')).length, 2);
+      final dashboard = DashboardService(LancamentoRepository(banco: db),
+        faturaRepository: faturasRepo);
+      expect(await dashboard.listarFaturasDashboard(
+        ano: posterior.year, mes: posterior.month), isEmpty);
+      expect(await faturasRepo.listarResumoDashboard(
+        ano: posterior.year, mes: posterior.month), hasLength(1));
 
       final fechamento = await faturasService.atualizarFaturasAutomaticamente(
         dataReferencia: '$ano-$mes-15',
