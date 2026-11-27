@@ -7,6 +7,7 @@ import '../repositories/movimentacao_repository.dart';
 import '../services/cartao_service.dart';
 import '../services/fatura_service.dart';
 import '../theme/app_theme.dart';
+import 'cartao_form_screen.dart';
 
 class CartoesScreen extends StatefulWidget {
   final CartaoService? cartaoService;
@@ -184,6 +185,58 @@ class _CartoesScreenState extends State<CartoesScreen> {
     }
   }
 
+  Future<void> _abrirFormulario([CartaoModel? cartao]) async {
+    final mudou = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => CartaoFormScreen(
+          service: _cartaoService,
+          cartao: cartao,
+        ),
+      ),
+    );
+    if (mudou == true && mounted) _atualizar();
+  }
+
+  Future<void> _alterarStatus(CartaoModel cartao) async {
+    final inativar = cartao.status == 'ATIVO';
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(inativar ? 'Inativar cartão?' : 'Reativar cartão?'),
+        content: Text(
+          inativar
+              ? 'O cartão será inativado sem apagar suas faturas e histórico.'
+              : 'O cartão voltará a ficar disponível para novas compras.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Voltar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(inativar ? 'Confirmar inativação' : 'Confirmar reativação'),
+          ),
+        ],
+      ),
+    );
+    if (confirmado != true || !mounted) return;
+    try {
+      if (inativar) {
+        await _cartaoService.inativarCartao(cartao.id!);
+      } else {
+        await _cartaoService.reativarCartao(cartao.id!);
+      }
+      if (mounted) _atualizar();
+    } catch (erro) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Não foi possível alterar o cartão: $erro')),
+        );
+      }
+    }
+  }
+
   Widget _linhaCartao(CartaoModel cartao) {
     final cores = Theme.of(context).colorScheme;
     return Card(
@@ -194,18 +247,41 @@ class _CartoesScreenState extends State<CartoesScreen> {
           '${cartao.instituicao} · Fecha dia ${cartao.diaFechamento} '
           '· Vence dia ${cartao.diaVencimento}',
         ),
-        trailing: Column(
+        trailing: Row(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(_moeda(cartao.limiteTotal)),
-            Text(
-              cartao.status == 'ATIVO' ? 'Ativo' : 'Inativo',
-              style: TextStyle(
-                color: cartao.status == 'ATIVO'
-                    ? AppTheme.corReceita(context) : cores.onSurfaceVariant,
-              ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(_moeda(cartao.limiteTotal)),
+                Text(
+                  cartao.status == 'ATIVO' ? 'Ativo' : 'Inativo',
+                  style: TextStyle(
+                    color: cartao.status == 'ATIVO'
+                        ? AppTheme.corReceita(context) : cores.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            PopupMenuButton<String>(
+              tooltip: 'Ações do cartão ${cartao.nome}',
+              onSelected: (acao) {
+                if (acao == 'editar') {
+                  _abrirFormulario(cartao);
+                } else if (acao == 'status') {
+                  _alterarStatus(cartao);
+                }
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'editar', child: Text('Editar cartão')),
+                PopupMenuItem(
+                  value: 'status',
+                  child: Text(cartao.status == 'ATIVO'
+                      ? 'Inativar cartão' : 'Reativar cartão'),
+                ),
+              ],
             ),
           ],
         ),
@@ -271,6 +347,11 @@ class _CartoesScreenState extends State<CartoesScreen> {
             children: [
               Expanded(child: Text('Cartões',
                 style: textos.headlineSmall?.copyWith(fontWeight: FontWeight.bold))),
+              IconButton(
+                onPressed: () => _abrirFormulario(),
+                tooltip: 'Novo cartão',
+                icon: const Icon(Icons.add_circle_outline),
+              ),
               IconButton(
                 onPressed: _atualizar,
                 tooltip: 'Atualizar cartões e faturas',
