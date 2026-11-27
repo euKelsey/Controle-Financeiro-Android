@@ -66,7 +66,7 @@ ControleFinanceiroApp _appTeste() {
       temaAtual: tema,
       onTemaAlterado: alterar,
       faturaService: faturaService,
-      dashboardBuilder: (r) => DashboardScreen(service: dashboard, revisaoDados: r),
+      dashboardBuilder: (r) => DashboardScreen(service: dashboard, revisaoDados: r, iniciarAnual: true),
       lancamentosBuilder: (r) => LancamentosScreen(service: service, revisaoDados: r),
       cartoesBuilder: (r) => CartoesScreen(
         cartaoService: cartoes,
@@ -90,7 +90,7 @@ void main() {
     for (final label in ['Início', 'Lançamentos', 'Cartões', 'Mais']) {
       expect(find.widgetWithText(NavigationDestination, label), findsOneWidget);
     }
-    expect(find.text('Resumo do mês'), findsOneWidget);
+    expect(find.text('Saldo previsto anual'), findsOneWidget);
   });
 
   testWidgets('Permite navegar entre as abas', (tester) async {
@@ -106,7 +106,30 @@ void main() {
 
     await tester.tap(find.widgetWithText(NavigationDestination, 'Início'));
     await tester.pumpAndSettle();
+    expect(find.text('Saldo previsto anual'), findsOneWidget);
+  });
+
+  testWidgets('Navega entre anos e abre o mês selecionado', (tester) async {
+    await tester.pumpWidget(_appTeste());
+    await tester.pumpAndSettle();
+    final ano = DateTime.now().year;
+    expect(find.text('$ano'), findsOneWidget);
+    await tester.tap(find.byTooltip('Próximo ano'));
+    await tester.pumpAndSettle();
+    expect(find.text('${ano + 1}'), findsOneWidget);
+    final mes = find.byKey(const ValueKey('mes-1'));
+    await tester.ensureVisible(mes);
+    await tester.tap(mes);
+    await tester.pumpAndSettle();
+    expect(find.text('Janeiro de ${ano + 1}'), findsOneWidget);
     expect(find.text('Resumo do mês'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('${ano + 1}'), findsOneWidget);
+    await tester.ensureVisible(find.text('Voltar ao ano atual'));
+    await tester.tap(find.text('Voltar ao ano atual'));
+    await tester.pumpAndSettle();
+    expect(find.text('$ano'), findsOneWidget);
   });
 
   testWidgets('Exibe as opções de tema', (tester) async {
