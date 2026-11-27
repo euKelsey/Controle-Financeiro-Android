@@ -116,8 +116,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _anoSelecionado = hoje.year;
       _mesSelecionado = hoje.month;
 
-      // Atualiza os valores do mes atual.
+      // Atualiza o resumo e as faturas do mes atual.
       _resumo = _consultarPeriodoSelecionado();
+      _faturas = _consultarFaturasSelecionadas();
     });
   }
 
@@ -127,6 +128,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _resumo = _consultarPeriodoSelecionado();
 
       _vencimentos = _service.listarProximosVencimentos();
+      _faturas = _consultarFaturasSelecionadas();
     });
   }
 
@@ -144,7 +146,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
 
     try {
-      // Aguarda as duas consultas terminarem.
+      // Aguarda as tres consultas terminarem.
       await Future.wait([novaConsulta, novosVencimentos, novasFaturas]);
     } catch (erro) {
       // Cada FutureBuilder apresentara seu erro.
