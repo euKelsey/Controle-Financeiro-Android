@@ -130,8 +130,46 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Compra UI teste'), findsOneWidget);
       expect(find.text('Segunda compra teste'), findsOneWidget);
+      await tester.tap(find.byTooltip('Ações da compra Compra UI teste'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Editar compra'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const ValueKey('compra-valor')), '1000,00');
+      await tester.ensureVisible(find.text('Salvar compra'));
+      await tester.tap(find.text('Salvar compra'));
+      await tester.pumpAndSettle();
+      expect((await comprasService.buscarCompraPorId(compras.single.id!)).valorTotal, 100000);
+      expect((await db.query('parcela_cartao', where: 'compra_cartao_id = ?',
+        whereArgs: [compras.single.id])).single['valor'], 100000);
+      expect((await LancamentoRepository(banco: db).obterResumoMensal(
+        ano: periodo.year, mes: periodo.month)).despesas, 101000);
+
+      await tester.tap(find.byTooltip('Ações da compra Segunda compra teste'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Cancelar compra'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirmar cancelamento'));
+      await tester.pumpAndSettle();
+      expect((await comprasService.listarCompras()).where((c) => c.status == 'CANCELADA').length, 1);
+      expect((await LancamentoRepository(banco: db).obterResumoMensal(
+        ano: periodo.year, mes: periodo.month)).despesas, 100000);
       await tester.pageBack();
       await tester.pumpAndSettle();
+
+      // Uma mudança de competência cria/reutiliza a fatura de destino.
+      final posterior = DateTime(periodo.year, periodo.month + 1, 2);
+      final dataPosterior = posterior.toIso8601String().substring(0, 10);
+      await comprasService.atualizarCompra(compraId: compras.single.id!,
+        categoriaId: categoriaId, descricao: 'Compra UI teste',
+        dataCompra: dataPosterior, valorTotal: 100000);
+      expect((await LancamentoRepository(banco: db).obterResumoMensal(
+        ano: posterior.year, mes: posterior.month)).despesas, 100000);
+      expect((await LancamentoRepository(banco: db).obterResumoMensal(
+        ano: periodo.year, mes: periodo.month)).despesas, 0);
+      await comprasService.atualizarCompra(compraId: compras.single.id!,
+        categoriaId: categoriaId, descricao: 'Compra UI teste',
+        dataCompra: iso, valorTotal: 100000);
+      expect((await db.query('fatura')).length, 2);
 
       final fechamento = await faturasService.atualizarFaturasAutomaticamente(
         dataReferencia: '$ano-$mes-15',
@@ -147,7 +185,12 @@ void main() {
       ), throwsStateError);
       final lancamentos = await db.query('lancamento');
       expect(lancamentos.length, 1);
-      expect(lancamentos.single['valor_previsto'], 13590);
+      expect(lancamentos.single['valor_previsto'], 100000);
+      await expectLater(comprasService.cancelarCompra(compras.single.id!), throwsStateError);
+      await expectLater(comprasService.atualizarCompra(compraId: compras.single.id!,
+        categoriaId: categoriaId, descricao: 'Bloqueada', dataCompra: iso,
+        valorTotal: 1), throwsStateError);
+      expect((await comprasService.buscarCompraPorId(compras.single.id!)).valorTotal, 100000);
       expect((await db.query('compra_cartao')).length, 2);
       expect(await db.rawQuery('PRAGMA foreign_key_check'), isEmpty);
       await tester.pumpWidget(const SizedBox.shrink());
