@@ -167,39 +167,45 @@ class LancamentoRepository {
         '${proximoMes.year.toString().padLeft(4, '0')}-'
         '${proximoMes.month.toString().padLeft(2, '0')}-01';
 
-    // REGRA 3: Somar os lançamentos do período.
+    // Lancamentos comuns seguem a data prevista. Faturas seguem a
+    // competencia, inclusive quando vencem no mes seguinte.
+    final competencia = inicio.substring(0, 7);
     final resultado = await db.rawQuery(
       '''
+      WITH itens AS (
+        SELECT tipo, valor_previsto AS valor
+        FROM lancamento
+        WHERE data_prevista >= ? AND data_prevista < ?
+          AND origem <> 'FATURA'
+          AND status IN ('PENDENTE', 'EFETIVADO')
+
+        UNION ALL
+
+        SELECT 'DESPESA', l.valor_previsto
+        FROM lancamento l
+        JOIN fatura f ON f.id = l.fatura_id
+        WHERE f.mes_referencia = ?
+          AND l.origem = 'FATURA'
+          AND l.status IN ('PENDENTE', 'EFETIVADO')
+
+        UNION ALL
+
+        SELECT 'DESPESA', p.valor
+        FROM fatura f
+        JOIN parcela_cartao p ON p.fatura_id = f.id
+        JOIN compra_cartao c ON c.id = p.compra_cartao_id
+        WHERE f.mes_referencia = ?
+          AND c.status = 'ATIVA'
+          AND NOT EXISTS (
+            SELECT 1 FROM lancamento l WHERE l.fatura_id = f.id
+          )
+      )
       SELECT
-        COALESCE(
-          SUM(
-            CASE
-              WHEN tipo = 'RECEITA'
-              THEN valor_previsto
-              ELSE 0
-            END
-          ),
-          0
-        ) AS receitas,
-
-        COALESCE(
-          SUM(
-            CASE
-              WHEN tipo = 'DESPESA'
-              THEN valor_previsto
-              ELSE 0
-            END
-          ),
-          0
-        ) AS despesas
-
-      FROM lancamento
-
-      WHERE data_prevista >= ?
-        AND data_prevista < ?
-        AND status IN ('PENDENTE', 'EFETIVADO')
+        COALESCE(SUM(CASE WHEN tipo = 'RECEITA' THEN valor ELSE 0 END), 0) AS receitas,
+        COALESCE(SUM(CASE WHEN tipo = 'DESPESA' THEN valor ELSE 0 END), 0) AS despesas
+      FROM itens
       ''',
-      [inicio, fim],
+      [inicio, fim, competencia, competencia],
     );
 
     // REGRA 4: Converter os resultados.
