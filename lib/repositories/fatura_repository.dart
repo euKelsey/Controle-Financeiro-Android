@@ -4,6 +4,17 @@ import 'package:sqflite/sqflite.dart';
 import '../database/database_helper.dart';
 import '../models/fatura_model.dart';
 
+// Resumo de uma fatura para a tela inicial. Valores em centavos.
+typedef FaturaResumoDashboard = ({
+  int id,
+  String cartaoNome,
+  String mesReferencia,
+  String dataVencimento,
+  String statusFatura,
+  String situacaoPagamento,
+  int valorTotal,
+});
+
 class FaturaRepository {
   final Database? _bancoTeste;
 
@@ -281,6 +292,57 @@ class FaturaRepository {
       consistente: totalCompras > 0 &&
           totalCompras == valorLancamento,
     );
+  }
+
+  // Consulta faturas de um mes (todos os cartoes), sem somar compras
+  // novamente ao resumo financeiro dos lancamentos.
+  Future<List<FaturaResumoDashboard>> listarResumoDashboard({
+    required int ano,
+    required int mes,
+    int limite = 5,
+  }) async {
+    if (ano < 1 || ano > 9999 || mes < 1 || mes > 12) {
+      throw ArgumentError('Periodo da fatura invalido.');
+    }
+    if (limite < 1 || limite > 50) {
+      throw ArgumentError('O limite deve estar entre 1 e 50.');
+    }
+    final mesReferencia =
+        '${ano.toString().padLeft(4, '0')}-${mes.toString().padLeft(2, '0')}';
+    final db = await _obterBanco();
+    final registros = await db.rawQuery('''
+      SELECT f.id, c.nome AS cartao_nome, f.mes_referencia,
+             f.data_vencimento, f.status AS status_fatura,
+             COALESCE((
+               SELECT SUM(p.valor)
+               FROM parcela_cartao p
+               INNER JOIN compra_cartao cp
+                 ON cp.id = p.compra_cartao_id
+               WHERE p.fatura_id = f.id AND cp.status = 'ATIVA'
+             ), 0) AS valor_total,
+             CASE
+               WHEN l.status = 'EFETIVADO' THEN 'PAGA'
+               WHEN l.status = 'PENDENTE' THEN 'PENDENTE'
+               WHEN l.status = 'CANCELADO' THEN 'CANCELADA'
+               WHEN f.status = 'ABERTA' THEN 'ABERTA'
+               ELSE 'FECHADA'
+             END AS situacao_pagamento
+      FROM fatura f
+      INNER JOIN cartao c ON c.id = f.cartao_id
+      LEFT JOIN lancamento l ON l.fatura_id = f.id
+      WHERE f.mes_referencia = ?
+      ORDER BY f.data_vencimento ASC, f.id ASC
+      LIMIT ?
+    ''', [mesReferencia, limite]);
+    return registros.map((registro) => (
+      id: registro['id'] as int,
+      cartaoNome: registro['cartao_nome'] as String,
+      mesReferencia: registro['mes_referencia'] as String,
+      dataVencimento: registro['data_vencimento'] as String,
+      statusFatura: registro['status_fatura'] as String,
+      situacaoPagamento: registro['situacao_pagamento'] as String,
+      valorTotal: registro['valor_total'] as int,
+    )).toList();
   }
 
 }
