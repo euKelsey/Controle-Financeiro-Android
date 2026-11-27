@@ -11,6 +11,17 @@ import 'package:controle_financeiro_android/services/dashboard_service.dart';
 import 'package:controle_financeiro_android/screens/dashboard_screen.dart';
 import 'package:controle_financeiro_android/theme/app_theme.dart';
 
+// Restringe a busca aos cartões de resumo, não à lista de vencimentos.
+Finder valorResumo(String valor) => find.descendant(
+  of: find.byType(Card).filter((element) {
+    final card = element.widget as Card;
+    return card.key == const ValueKey('resumo-saldo') ||
+        card.key == const ValueKey('resumo-Receitas') ||
+        card.key == const ValueKey('resumo-Despesas');
+  }),
+  matching: find.text(valor),
+);
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -134,17 +145,17 @@ void main() {
 
         // TESTE 1: Conferir os valores iniciais.
         expect(
-          find.text('R\$ 5.000,00'),
+          valorResumo('R\$ 5.000,00'),
           findsOneWidget,
         );
 
         expect(
-          find.text('R\$ 1.500,00'),
+          valorResumo('R\$ 1.500,00'),
           findsOneWidget,
         );
 
         expect(
-          find.text('R\$ 3.500,00'),
+          valorResumo('R\$ 3.500,00'),
           findsOneWidget,
         );
 
@@ -174,7 +185,7 @@ void main() {
         // TESTE 3: Os valores anteriores
         // permanecem ate a atualizacao.
         expect(
-          find.text('R\$ 1.500,00'),
+          valorResumo('R\$ 1.500,00'),
           findsOneWidget,
         );
 
@@ -191,24 +202,24 @@ void main() {
 
         // TESTE 4: Conferir os valores atualizados.
         expect(
-          find.text('R\$ 5.000,00'),
+          valorResumo('R\$ 5.000,00'),
           findsOneWidget,
         );
 
         expect(
-          find.text('R\$ 2.000,00'),
+          valorResumo('R\$ 2.000,00'),
           findsOneWidget,
         );
 
         expect(
-          find.text('R\$ 3.000,00'),
+          valorResumo('R\$ 3.000,00'),
           findsOneWidget,
         );
 
         // TESTE 5: O valor antigo nao
         // deve continuar na interface.
         expect(
-          find.text('R\$ 1.500,00'),
+          valorResumo('R\$ 1.500,00'),
           findsNothing,
         );
 
