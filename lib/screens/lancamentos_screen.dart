@@ -7,15 +7,24 @@ import '../theme/app_theme.dart';
 import 'lancamento_form_screen.dart';
 
 class LancamentosScreen extends StatefulWidget {
+  final int revisaoDados;
   final LancamentoService? service;
 
-  const LancamentosScreen({super.key, this.service});
+  const LancamentosScreen({super.key, this.service, this.revisaoDados = 0});
 
   @override
   State<LancamentosScreen> createState() => _LancamentosScreenState();
 }
 
 class _LancamentosScreenState extends State<LancamentosScreen> {
+  @override
+  void didUpdateWidget(covariant LancamentosScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.revisaoDados != widget.revisaoDados) {
+      _atualizar();
+    }
+  }
+
   late final LancamentoService _service;
   late Future<List<LancamentoModel>> _lancamentos;
   late int _ano;
