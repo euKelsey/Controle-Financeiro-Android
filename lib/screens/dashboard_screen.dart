@@ -1,3 +1,4 @@
+import 'dashboard_anual_view.dart';
 import '../repositories/recorrencia_repository.dart';
 import 'package:flutter/material.dart';
 
@@ -10,8 +11,12 @@ import '../models/lancamento_model.dart';
 class DashboardScreen extends StatefulWidget {
   final int revisaoDados;
   final DashboardService? service;
+  final bool iniciarAnual;
+  final int? anoInicial;
+  final int? mesInicial;
 
-  const DashboardScreen({super.key, this.service, this.revisaoDados = 0});
+  const DashboardScreen({super.key, this.service, this.revisaoDados = 0,
+    this.iniciarAnual = false, this.anoInicial, this.mesInicial});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -61,8 +66,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Identifica o mes e ano atuais do aparelho.
     final hoje = DateTime.now();
 
-    _anoSelecionado = hoje.year;
-    _mesSelecionado = hoje.month;
+    _anoSelecionado = widget.anoInicial ?? hoje.year;
+    _mesSelecionado = widget.mesInicial ?? hoje.month;
 
     // Configura o Service principal ou o de testes.
     _service = widget.service ??
@@ -186,6 +191,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.iniciarAnual) {
+      return DashboardAnualView(service: _service, revisaoDados: widget.revisaoDados);
+    }
     final cores = Theme.of(context).colorScheme;
     final textos = Theme.of(context).textTheme;
 
