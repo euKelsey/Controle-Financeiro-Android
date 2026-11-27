@@ -277,7 +277,7 @@ class LancamentoService {
     }
 
     // Apenas lançamentos pendentes podem ser cancelados.
-    if (existente.status != 'PENDENTE') {
+    if (existente.status != 'PENDENTE' && !(registroDireto && existente.origem == 'MANUAL' && existente.status == 'EFETIVADO')) {
       throw ArgumentError(
         'Somente lançamentos pendentes podem ser cancelados.',
       );
