@@ -1,3 +1,4 @@
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -67,6 +68,9 @@ class _ControleFinanceiroAppState extends State<ControleFinanceiroApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Controle Financeiro',
+      locale: const Locale('pt', 'BR'),
+      supportedLocales: const [Locale('pt', 'BR')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       debugShowCheckedModeBanner: false,
 
       theme: AppTheme.temaClaro,
