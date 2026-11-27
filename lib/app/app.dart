@@ -6,7 +6,9 @@ import '../theme/app_theme.dart';
 import '../screens/home_screen.dart';
 
 class ControleFinanceiroApp extends StatefulWidget {
-  const ControleFinanceiroApp({super.key});
+  final HomeScreen Function(ThemeMode, ValueChanged<ThemeMode>)? homeBuilder;
+
+  const ControleFinanceiroApp({super.key, this.homeBuilder});
 
   @override
   State<ControleFinanceiroApp> createState() => _ControleFinanceiroAppState();
@@ -72,7 +74,8 @@ class _ControleFinanceiroAppState extends State<ControleFinanceiroApp> {
 
       themeMode: _temaAtual,
 
-      home: HomeScreen(temaAtual: _temaAtual, onTemaAlterado: _alterarTema),
+      home: widget.homeBuilder?.call(_temaAtual, _alterarTema) ??
+          HomeScreen(temaAtual: _temaAtual, onTemaAlterado: _alterarTema),
     );
   }
 }

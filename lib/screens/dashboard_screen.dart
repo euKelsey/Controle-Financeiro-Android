@@ -352,6 +352,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   // Cartao principal do saldo.
                   Card(
+                    key: const ValueKey('resumo-saldo'),
                     child: Padding(
                       padding: const EdgeInsets.all(20),
                       child: Column(
@@ -742,6 +743,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final textos = Theme.of(context).textTheme;
 
     return Card(
+      key: ValueKey('resumo-$titulo'),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

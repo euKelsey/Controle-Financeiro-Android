@@ -10,6 +10,15 @@ import 'package:controle_financeiro_android/services/dashboard_service.dart';
 import 'package:controle_financeiro_android/screens/dashboard_screen.dart';
 import 'package:controle_financeiro_android/theme/app_theme.dart';
 
+// Restringe a busca aos cartões de resumo, não à lista de vencimentos.
+Finder valorResumo(String valor) => find.descendant(
+  of: find.byWidgetPredicate((widget) => widget is Card &&
+      (widget.key == const ValueKey('resumo-saldo') ||
+       widget.key == const ValueKey('resumo-Receitas') ||
+       widget.key == const ValueKey('resumo-Despesas'))),
+  matching: find.text(valor),
+);
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -110,42 +119,42 @@ void main() {
       await tester.pumpAndSettle();
 
       // TESTE 1: Exibir os valores do mes atual.
-      expect(find.text('R\$ 5.000,00'), findsOneWidget);
-      expect(find.text('R\$ 1.500,00'), findsOneWidget);
-      expect(find.text('R\$ 3.500,00'), findsOneWidget);
+      expect(valorResumo('R\$ 5.000,00'), findsOneWidget);
+      expect(valorResumo('R\$ 1.500,00'), findsOneWidget);
+      expect(valorResumo('R\$ 3.500,00'), findsOneWidget);
 
       // TESTE 2: Navegar ao mes anterior.
       await tester.tap(find.byTooltip('Mês anterior'));
       await tester.pumpAndSettle();
 
-      expect(find.text('R\$ 3.000,00'), findsOneWidget);
-      expect(find.text('R\$ 500,00'), findsOneWidget);
-      expect(find.text('R\$ 2.500,00'), findsOneWidget);
+      expect(valorResumo('R\$ 3.000,00'), findsOneWidget);
+      expect(valorResumo('R\$ 500,00'), findsOneWidget);
+      expect(valorResumo('R\$ 2.500,00'), findsOneWidget);
 
       // TESTE 3: Confirmar que o mes atual
       // nao continua exibido.
-      expect(find.text('R\$ 5.000,00'), findsNothing);
+      expect(valorResumo('R\$ 5.000,00'), findsNothing);
 
       // TESTE 4: Voltar ao mes atual.
       await tester.tap(find.byTooltip('Próximo mês'));
       await tester.pumpAndSettle();
 
-      expect(find.text('R\$ 3.500,00'), findsOneWidget);
+      expect(valorResumo('R\$ 3.500,00'), findsOneWidget);
 
       // TESTE 5: Navegar ao proximo mes.
       await tester.tap(find.byTooltip('Próximo mês'));
       await tester.pumpAndSettle();
 
-      expect(find.text('R\$ 4.000,00'), findsOneWidget);
-      expect(find.text('R\$ 1.000,00'), findsOneWidget);
-      expect(find.text('R\$ 3.000,00'), findsOneWidget);
+      expect(valorResumo('R\$ 4.000,00'), findsOneWidget);
+      expect(valorResumo('R\$ 1.000,00'), findsOneWidget);
+      expect(valorResumo('R\$ 3.000,00'), findsOneWidget);
 
       // TESTE 6: Recarregar sem perder o periodo.
       await tester.tap(find.byTooltip('Atualizar resumo financeiro'));
       await tester.pumpAndSettle();
 
-      expect(find.text('R\$ 4.000,00'), findsOneWidget);
-      expect(find.text('R\$ 1.000,00'), findsOneWidget);
+      expect(valorResumo('R\$ 4.000,00'), findsOneWidget);
+      expect(valorResumo('R\$ 1.000,00'), findsOneWidget);
 
       // TESTE 7: O botao de retorno deve aparecer,
       // pois estamos consultando o proximo mes.
@@ -159,11 +168,11 @@ void main() {
 
       // O mes atual deve apresentar os valores
       // cadastrados anteriormente.
-      expect(find.text('R\$ 5.000,00'), findsOneWidget);
+      expect(valorResumo('R\$ 5.000,00'), findsOneWidget);
 
-      expect(find.text('R\$ 1.500,00'), findsOneWidget);
+      expect(valorResumo('R\$ 1.500,00'), findsOneWidget);
 
-      expect(find.text('R\$ 3.500,00'), findsOneWidget);
+      expect(valorResumo('R\$ 3.500,00'), findsOneWidget);
 
       // TESTE 9: O botao deve desaparecer.
       expect(botaoMesAtual, findsNothing);
@@ -174,9 +183,9 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('R\$ 4.000,00'), findsOneWidget);
+      expect(valorResumo('R\$ 4.000,00'), findsOneWidget);
 
-      expect(find.text('R\$ 1.000,00'), findsOneWidget);
+      expect(valorResumo('R\$ 1.000,00'), findsOneWidget);
 
       // TESTE 11: Registrar nova despesa
       // no mes futuro, sem atualizar a tela.
@@ -184,7 +193,7 @@ void main() {
 
       // A tela ainda deve mostrar os
       // valores da consulta anterior.
-      expect(find.text('R\$ 1.000,00'), findsOneWidget);
+      expect(valorResumo('R\$ 1.000,00'), findsOneWidget);
 
       // TESTE 12: Simular o gesto de
       // puxar a tela para baixo.
@@ -193,11 +202,11 @@ void main() {
       await tester.pumpAndSettle();
 
       // TESTE 13: Conferir valores atualizados.
-      expect(find.text('R\$ 4.000,00'), findsOneWidget);
+      expect(valorResumo('R\$ 4.000,00'), findsOneWidget);
 
-      expect(find.text('R\$ 1.200,00'), findsOneWidget);
+      expect(valorResumo('R\$ 1.200,00'), findsOneWidget);
 
-      expect(find.text('R\$ 2.800,00'), findsOneWidget);
+      expect(valorResumo('R\$ 2.800,00'), findsOneWidget);
 
       // TESTE 14: A atualizacao por gesto
       // nao deve alterar o mes selecionado.
@@ -207,7 +216,7 @@ void main() {
       await tester.tap(botaoMesAtual);
       await tester.pumpAndSettle();
 
-      expect(find.text('R\$ 3.500,00'), findsOneWidget);
+      expect(valorResumo('R\$ 3.500,00'), findsOneWidget);
 
       expect(botaoMesAtual, findsNothing);
 
