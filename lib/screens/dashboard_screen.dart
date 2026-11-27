@@ -7,15 +7,24 @@ import '../theme/app_theme.dart';
 import '../models/lancamento_model.dart';
 
 class DashboardScreen extends StatefulWidget {
+  final int revisaoDados;
   final DashboardService? service;
 
-  const DashboardScreen({super.key, this.service});
+  const DashboardScreen({super.key, this.service, this.revisaoDados = 0});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  @override
+  void didUpdateWidget(covariant DashboardScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.revisaoDados != widget.revisaoDados) {
+      _atualizarResumo();
+    }
+  }
+
   late final DashboardService _service;
 
   late Future<({int receitas, int despesas, int saldoPrevisto})> _resumo;
