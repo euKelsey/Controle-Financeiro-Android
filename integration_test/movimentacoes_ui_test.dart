@@ -15,7 +15,7 @@ import 'package:controle_financeiro_android/theme/app_theme.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('Pagamento e recebimento integrais pela interface', (tester) async {
+  testWidgets('Registro direto, edição e cancelamento pela interface', (tester) async {
     final caminho = join(await getDatabasesPath(), 'teste_movimentacoes_ui.db');
     await deleteDatabase(caminho);
     final schema = await rootBundle.loadString('assets/sql/schema.sql');
@@ -50,11 +50,11 @@ void main() {
       });
       final despesa = await service.cadastrarLancamento(
         tipo: 'DESPESA', descricao: 'Conta teste pagamento',
-        valorPrevisto: 12050, dataPrevista: data, categoriaId: despesaId,
+        valorPrevisto: 12050, dataPrevista: data, categoriaId: despesaId, registroDireto: true,
       );
       final receita = await service.cadastrarLancamento(
         tipo: 'RECEITA', descricao: 'Salário teste recebimento',
-        valorPrevisto: 100000, dataPrevista: data, categoriaId: receitaId,
+        valorPrevisto: 100000, dataPrevista: data, categoriaId: receitaId, registroDireto: true,
       );
 
       await tester.pumpWidget(MaterialApp(
@@ -64,36 +64,39 @@ void main() {
         )),
       ));
       await tester.pumpAndSettle();
+      expect((await lancamentos.buscarPorId(despesa.id!))!.status, 'EFETIVADO');
+      expect((await lancamentos.buscarPorId(receita.id!))!.status, 'EFETIVADO');
       final menuDespesa = find.byTooltip('Ações de Conta teste pagamento');
       await tester.ensureVisible(menuDespesa);
       await tester.tap(menuDespesa);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Registrar pagamento'));
+      expect(find.text('Registrar pagamento'), findsNothing);
+      await tester.tap(find.text('Editar'));
       await tester.pumpAndSettle();
-      expect(find.text('Registrar pagamento'), findsOneWidget);
-      final confirmar = find.text('Confirmar movimentação');
-      await tester.ensureVisible(confirmar);
-      await tester.tap(confirmar);
+      await tester.enterText(find.byType(TextFormField).at(1), '200,00');
+      await tester.ensureVisible(find.text('Salvar lançamento'));
+      await tester.tap(find.text('Salvar lançamento'));
       await tester.pumpAndSettle();
-      expect((await lancamentos.buscarPorId(despesa.id!))!.status, 'EFETIVADO');
-      expect(find.byTooltip('Ações de Conta teste pagamento'), findsNothing);
-
+      expect((await lancamentos.buscarPorId(despesa.id!))!.valorPrevisto, 20000);
+      expect((await movimentacoes.buscarPorLancamentoId(despesa.id!))!.valor, 20000);
       final menuReceita = find.byTooltip('Ações de Salário teste recebimento');
       await tester.ensureVisible(menuReceita);
       await tester.tap(menuReceita);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Registrar recebimento'));
+      expect(find.text('Registrar recebimento'), findsNothing);
+      await tester.tap(find.text('Cancelar'));
       await tester.pumpAndSettle();
-      expect(find.text('Registrar recebimento'), findsOneWidget);
-      await tester.ensureVisible(confirmar);
-      await tester.tap(confirmar);
+      await tester.tap(find.text('Confirmar cancelamento'));
       await tester.pumpAndSettle();
-
-      expect((await lancamentos.buscarPorId(receita.id!))!.status, 'EFETIVADO');
+      expect((await lancamentos.buscarPorId(receita.id!))!.status, 'CANCELADO');
+      expect(await movimentacoes.buscarPorLancamentoId(receita.id!), isNotNull);
       final registros = await movimentacoes.listar();
-      expect(registros.length, 2);
-      expect(registros.map((m) => m.valor).toSet(), {12050, 100000});
-      expect(registros.every((m) => m.forma == 'PIX' && m.dataMovimentacao == data), isTrue);
+      expect(registros.length, 1);
+      expect(registros.single.valor, 20000);
+      expect(registros.single.forma, 'OUTRO');
+      final resumo = await lancamentos.obterResumoMensal(ano: hoje.year, mes: hoje.month);
+      expect(resumo.receitas, 0);
+      expect(resumo.despesas, 20000);
       await expectLater(
         movService.cadastrarMovimentacao(
           lancamentoId: despesa.id!, valor: 12050,
