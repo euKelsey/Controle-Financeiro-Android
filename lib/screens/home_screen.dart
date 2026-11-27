@@ -89,7 +89,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   List<Widget> get _paginas => [
     widget.dashboardBuilder?.call(_revisaoDados) ??
-        DashboardScreen(revisaoDados: _revisaoDados),
+        DashboardScreen(revisaoDados: _revisaoDados, iniciarAnual: true),
     widget.lancamentosBuilder?.call(_revisaoDados) ??
         LancamentosScreen(revisaoDados: _revisaoDados),
     widget.cartoesBuilder?.call(_revisaoDados) ??
