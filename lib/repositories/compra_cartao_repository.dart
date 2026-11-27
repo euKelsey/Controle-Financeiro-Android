@@ -182,4 +182,120 @@ class CompraCartaoRepository {
     });
   }
 
+
+  // A edição/cancelamento só pode ocorrer antes do fechamento real.
+  Future<Map<String, Object?>> _parcelaEditavel(
+    DatabaseExecutor txn, int compraId,
+  ) async {
+    final hoje = DateTime.now().toIso8601String().substring(0, 10);
+    final linhas = await txn.rawQuery('''
+      SELECT p.id AS parcela_id, f.id AS fatura_id, f.mes_referencia,
+             f.data_vencimento, f.data_fechamento, f.status AS fatura_status,
+             c.status AS compra_status, c.quantidade_parcelas, c.cartao_id,
+             c.data_compra, c.categoria_id, c.recorrencia_id
+      FROM compra_cartao c
+      JOIN parcela_cartao p ON p.compra_cartao_id = c.id
+      JOIN fatura f ON f.id = p.fatura_id
+      WHERE c.id = ?
+    ''', [compraId]);
+    if (linhas.length != 1) throw StateError('Compra sem parcela única vinculada.');
+    final linha = linhas.single;
+    if (linha['compra_status'] != 'ATIVA' ||
+        linha['quantidade_parcelas'] != 1 ||
+        linha['recorrencia_id'] != null ||
+        linha['fatura_status'] != 'ABERTA' ||
+        (linha['data_fechamento'] as String).compareTo(hoje) <= 0) {
+      throw StateError('Somente compras avulsas ativas de faturas abertas podem ser alteradas.');
+    }
+    final lancamentos = await txn.query('lancamento',
+      where: 'fatura_id = ?', whereArgs: [linha['fatura_id']], limit: 1);
+    if (lancamentos.isNotEmpty) throw StateError('Fatura já possui lançamento financeiro.');
+    return linha;
+  }
+
+  Future<bool> podeAlterar(int compraId) async {
+    final db = await _obterBanco();
+    try {
+      return await db.transaction((txn) async {
+        await _parcelaEditavel(txn, compraId);
+        return true;
+      });
+    } on StateError {
+      return false;
+    }
+  }
+
+  Future<void> atualizarCompraComParcela({
+    required int compraId,
+    required int categoriaId,
+    required String descricao,
+    required String dataCompra,
+    required int valorTotal,
+    required String mesReferencia,
+    required String dataFechamento,
+    required String dataVencimento,
+    String? observacao,
+  }) async {
+    final db = await _obterBanco();
+    final hoje = DateTime.now().toIso8601String().substring(0, 10);
+    await db.transaction((txn) async {
+      final origem = await _parcelaEditavel(txn, compraId);
+      final categorias = await txn.query('categoria',
+        where: 'id = ? AND tipo = ?', whereArgs: [categoriaId, 'DESPESA']);
+      if (categorias.length != 1 ||
+          (categorias.single['status'] != 'ATIVA' && categoriaId != origem['categoria_id'])) {
+        throw StateError('Categoria indisponível.');
+      }
+      var faturaId = origem['fatura_id'] as int;
+      var vencimento = origem['data_vencimento'] as String;
+      // Preserva a fatura histórica se a data não foi modificada.
+      if (dataCompra != origem['data_compra'] &&
+          mesReferencia != origem['mes_referencia']) {
+        final destino = await txn.query('fatura',
+          where: 'cartao_id = ? AND mes_referencia = ?',
+          whereArgs: [origem['cartao_id'], mesReferencia], limit: 1);
+        if (destino.isEmpty) {
+          if (dataFechamento.compareTo(hoje) <= 0) {
+            throw StateError('O fechamento da fatura de destino já chegou.');
+          }
+          faturaId = await txn.insert('fatura', {
+            'cartao_id': origem['cartao_id'], 'mes_referencia': mesReferencia,
+            'data_fechamento': dataFechamento, 'data_vencimento': dataVencimento,
+            'status': 'ABERTA',
+          });
+          vencimento = dataVencimento;
+        } else {
+          final f = destino.single;
+          if (f['status'] != 'ABERTA' ||
+              (f['data_fechamento'] as String).compareTo(hoje) <= 0) {
+            throw StateError('A fatura de destino não está disponível para alterações.');
+          }
+          faturaId = f['id'] as int;
+          vencimento = f['data_vencimento'] as String;
+          if ((await txn.query('lancamento', where: 'fatura_id = ?',
+              whereArgs: [faturaId], limit: 1)).isNotEmpty) {
+            throw StateError('A fatura de destino já possui lançamento financeiro.');
+          }
+        }
+      }
+      await txn.update('compra_cartao', {
+        'categoria_id': categoriaId, 'descricao': descricao,
+        'data_compra': dataCompra, 'valor_total': valorTotal,
+        'observacao': observacao,
+      }, where: 'id = ?', whereArgs: [compraId]);
+      await txn.update('parcela_cartao', {
+        'fatura_id': faturaId, 'valor': valorTotal, 'data_prevista': vencimento,
+      }, where: 'id = ?', whereArgs: [origem['parcela_id']]);
+    });
+  }
+
+  Future<void> cancelarCompra(int compraId) async {
+    final db = await _obterBanco();
+    await db.transaction((txn) async {
+      await _parcelaEditavel(txn, compraId);
+      await txn.update('compra_cartao', {'status': 'CANCELADA'},
+        where: 'id = ?', whereArgs: [compraId]);
+    });
+  }
+
 }

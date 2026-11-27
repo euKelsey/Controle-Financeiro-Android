@@ -150,4 +150,48 @@ class CompraCartaoService {
       dataVencimento: datas.dataVencimento,
     );
   }
+
+  Future<bool> podeAlterarCompra(int id) => _repository.podeAlterar(id);
+
+  Future<List<CartaoModel>> listarCartoesFormulario({int? cartaoAtualId}) async {
+    final cartoes = await _cartaoRepository.listar();
+    return cartoes.where((c) => c.status == 'ATIVO' || c.id == cartaoAtualId).toList();
+  }
+
+  Future<List<CategoriaModel>> listarCategoriasFormulario({int? categoriaAtualId}) async {
+    final categorias = await _categoriaRepository.listar();
+    return categorias.where((c) => c.tipo == 'DESPESA' &&
+        (c.status == 'ATIVA' || c.id == categoriaAtualId)).toList();
+  }
+
+  Future<void> atualizarCompra({
+    required int compraId,
+    required int categoriaId,
+    required String descricao,
+    required String dataCompra,
+    required int valorTotal,
+    String? observacao,
+  }) async {
+    final compra = await buscarCompraPorId(compraId);
+    final cartao = await _cartaoRepository.buscarPorId(compra.cartaoId);
+    if (cartao == null) throw StateError('Cartão não encontrado.');
+    descricao = descricao.trim();
+    if (descricao.isEmpty || valorTotal <= 0) {
+      throw ArgumentError('Informe descrição e valor positivo.');
+    }
+    _validarData(dataCompra);
+    final mes = CompetenciaFaturaService.calcularMesFatura(
+      dataCompra: dataCompra, diaFechamento: cartao.diaFechamento);
+    final datas = CompetenciaFaturaService.calcularDatasFatura(
+      mesReferencia: mes, diaFechamento: cartao.diaFechamento,
+      diaVencimento: cartao.diaVencimento);
+    await _repository.atualizarCompraComParcela(
+      compraId: compraId, categoriaId: categoriaId, descricao: descricao,
+      dataCompra: dataCompra, valorTotal: valorTotal, mesReferencia: mes,
+      dataFechamento: datas.dataFechamento, dataVencimento: datas.dataVencimento,
+      observacao: observacao);
+  }
+
+  Future<void> cancelarCompra(int compraId) => _repository.cancelarCompra(compraId);
+
 }

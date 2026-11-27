@@ -218,46 +218,12 @@ class _CartoesScreenState extends State<CartoesScreen> {
   }
 
   Future<void> _verCompras() async {
-    final compras = _compraService.listarCompras();
     await Navigator.of(context).push<void>(
-      MaterialPageRoute(
-        builder: (_) => Scaffold(
-          appBar: AppBar(title: const Text('Compras no cartão')),
-          body: FutureBuilder<List<CompraCartaoModel>>(
-            future: compras,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return const Center(child: Text('Não foi possível carregar as compras.'));
-              }
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final lista = snapshot.data!;
-              if (lista.isEmpty) {
-                return const Center(child: Text('Nenhuma compra cadastrada.'));
-              }
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: lista.length,
-                itemBuilder: (context, i) {
-                  final compra = lista[i];
-                  return Card(
-                    child: ListTile(
-                      title: Text(compra.descricao),
-                      subtitle: Text(
-                        '${_data(compra.dataCompra)} · ${compra.quantidadeParcelas}x'
-                        ' · ${compra.status == 'ATIVA' ? 'Ativa' : 'Cancelada'}',
-                      ),
-                      trailing: Text(_moeda(compra.valorTotal)),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => _ComprasScreen(
+        service: _compraService, cartaoService: _cartaoService, moeda: _moeda, data: _data,
+      )),
     );
+    if (mounted) _atualizar();
   }
 
   Future<void> _abrirFormulario([CartaoModel? cartao]) async {
@@ -519,4 +485,105 @@ class _CartoesScreenState extends State<CartoesScreen> {
       ),
     );
   }
+}
+
+class _ComprasScreen extends StatefulWidget {
+  final CompraCartaoService service;
+  final CartaoService cartaoService;
+  final String Function(int) moeda;
+  final String Function(String) data;
+  const _ComprasScreen({required this.service, required this.cartaoService,
+    required this.moeda, required this.data});
+
+  @override
+  State<_ComprasScreen> createState() => _ComprasScreenState();
+}
+
+class _ComprasScreenState extends State<_ComprasScreen> {
+  late Future<List<({CompraCartaoModel compra, String cartao, bool editavel})>> _dados;
+  bool _ocupado = false;
+
+  Future<List<({CompraCartaoModel compra, String cartao, bool editavel})>> _consultar() async {
+    final cartoes = await widget.cartaoService.listarCartoes();
+    final nomes = {for (final c in cartoes) c.id: c.nome};
+    final compras = await widget.service.listarCompras();
+    return [
+      for (final c in compras)
+        (compra: c, cartao: nomes[c.cartaoId] ?? 'Cartão indisponível',
+          editavel: await widget.service.podeAlterarCompra(c.id!)),
+    ];
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _dados = _consultar();
+  }
+
+  Future<void> _acao(CompraCartaoModel compra, String acao) async {
+    if (_ocupado) return;
+    setState(() => _ocupado = true);
+    try {
+      if (acao == 'editar') {
+        await Navigator.of(context).push<bool>(MaterialPageRoute(
+          builder: (_) => CompraCartaoFormScreen(service: widget.service, compra: compra),
+        ));
+      } else {
+        final confirmar = await showDialog<bool>(context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Cancelar compra?'),
+            content: Text('A compra "${compra.descricao}" será retirada do total da fatura, preservando o histórico.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Voltar')),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirmar cancelamento')),
+            ],
+          ));
+        if (confirmar == true && mounted) await widget.service.cancelarCompra(compra.id!);
+      }
+    } catch (erro) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Não foi possível alterar a compra: $erro')));
+    } finally {
+      if (mounted) setState(() { _ocupado = false; _dados = _consultar(); });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Compras no cartão')),
+    body: FutureBuilder<List<({CompraCartaoModel compra, String cartao, bool editavel})>>(
+      future: _dados,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) return const Center(child: Text('Não foi possível carregar as compras.'));
+        if (snapshot.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
+        final lista = snapshot.data ?? [];
+        if (lista.isEmpty) return const Center(child: Text('Nenhuma compra cadastrada.'));
+        return ListView.builder(
+          padding: const EdgeInsets.all(16), itemCount: lista.length,
+          itemBuilder: (context, i) {
+            final item = lista[i];
+            final compra = item.compra;
+            return Card(child: ListTile(
+              title: Text(compra.descricao),
+              subtitle: Text('${item.cartao}\n${widget.data(compra.dataCompra)} · ${compra.quantidadeParcelas}x'
+                ' · ${compra.status == 'ATIVA' ? 'Ativa' : 'Cancelada'}'),
+              isThreeLine: true,
+              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text(widget.moeda(compra.valorTotal)),
+                if (item.editavel) PopupMenuButton<String>(
+                  enabled: !_ocupado,
+                  tooltip: 'Ações da compra ${compra.descricao}',
+                  onSelected: (acao) => _acao(compra, acao),
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'editar', child: Text('Editar compra')),
+                    PopupMenuItem(value: 'cancelar', child: Text('Cancelar compra')),
+                  ],
+                ),
+              ]),
+            ));
+          },
+        );
+      },
+    ),
+  );
 }
