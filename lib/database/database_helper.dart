@@ -22,6 +22,7 @@ class DatabaseHelper {
       version: versaoBanco,
       onConfigure: configurarConexao,
       onCreate: _criarBanco,
+      onOpen: inicializarCategoriasPadrao,
     );
 
     return _banco!;
@@ -57,6 +58,26 @@ class DatabaseHelper {
         await db.execute(sql);
       }
     }
+  }
+
+  // Também atende bancos V1 já existentes e ainda vazios de categorias.
+  static Future<void> inicializarCategoriasPadrao(Database db) async {
+    await db.transaction((txn) async {
+      final existentes = await txn.query('categoria', columns: ['id'], limit: 1);
+      if (existentes.isNotEmpty) return;
+      const padrao = {
+        'RECEITA': ['Salário', 'Renda extra', 'Outras receitas'],
+        'DESPESA': ['Alimentação', 'Moradia', 'Transporte', 'Saúde',
+          'Educação', 'Internet', 'Energia', 'Lazer', 'Outras despesas'],
+      };
+      for (final grupo in padrao.entries) {
+        for (final nome in grupo.value) {
+          await txn.insert('categoria', {
+            'nome': nome, 'tipo': grupo.key, 'status': 'ATIVA',
+          });
+        }
+      }
+    });
   }
 
   // Fecha a conexão quando necessário.
