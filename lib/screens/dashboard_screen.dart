@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../repositories/lancamento_repository.dart';
+import '../repositories/fatura_repository.dart';
 import '../services/dashboard_service.dart';
 import '../theme/app_theme.dart';
 import '../models/lancamento_model.dart';
@@ -21,6 +22,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Armazena a consulta dos proximos vencimentos.
   late Future<List<LancamentoModel>> _vencimentos;
+  late Future<List<FaturaResumoDashboard>> _faturas;
 
   // Periodo selecionado no Dashboard.
   late int _anoSelecionado;
@@ -53,19 +55,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _mesSelecionado = hoje.month;
 
     // Configura o Service principal ou o de testes.
-    _service = widget.service ?? DashboardService(LancamentoRepository());
+    _service = widget.service ??
+        DashboardService(
+          LancamentoRepository(),
+          faturaRepository: FaturaRepository(),
+        );
 
     // Consulta o periodo inicialmente selecionado.
     _resumo = _consultarPeriodoSelecionado();
 
     // Carrega os proximos vencimentos a partir de hoje.
     _vencimentos = _service.listarProximosVencimentos();
+    _faturas = _consultarFaturasSelecionadas();
   }
 
   // Consulta os valores do periodo selecionado.
   Future<({int receitas, int despesas, int saldoPrevisto})>
   _consultarPeriodoSelecionado() {
     return _service.obterResumoMensal(
+      ano: _anoSelecionado,
+      mes: _mesSelecionado,
+    );
+  }
+
+  // Faturas acompanham o periodo selecionado no resumo.
+  Future<List<FaturaResumoDashboard>> _consultarFaturasSelecionadas() {
+    return _service.listarFaturasDashboard(
       ano: _anoSelecionado,
       mes: _mesSelecionado,
     );
@@ -89,6 +104,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       // Recarrega os valores do novo periodo.
       _resumo = _consultarPeriodoSelecionado();
+      _faturas = _consultarFaturasSelecionadas();
     });
   }
 
@@ -119,15 +135,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final novaConsulta = _consultarPeriodoSelecionado();
 
     final novosVencimentos = _service.listarProximosVencimentos();
+    final novasFaturas = _consultarFaturasSelecionadas();
 
     setState(() {
       _resumo = novaConsulta;
       _vencimentos = novosVencimentos;
+      _faturas = novasFaturas;
     });
 
     try {
       // Aguarda as duas consultas terminarem.
-      await Future.wait([novaConsulta, novosVencimentos]);
+      await Future.wait([novaConsulta, novosVencimentos, novasFaturas]);
     } catch (erro) {
       // Cada FutureBuilder apresentara seu erro.
       debugPrint('Erro ao atualizar Dashboard: $erro');
@@ -495,15 +513,129 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           const SizedBox(height: 12),
 
-          _cartaoVazio(
-            context,
-            icone: Icons.credit_card_outlined,
-            mensagem: 'Suas faturas aparecerão aqui.',
+          FutureBuilder<List<FaturaResumoDashboard>>(
+            future: _faturas,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Card(
+                  child: Padding(
+                    padding: EdgeInsets.all(28),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                );
+              }
+
+              if (snapshot.hasError) {
+                return _cartaoVazio(
+                  context,
+                  icone: Icons.error_outline,
+                  mensagem: 'Não foi possível carregar as faturas.',
+                );
+              }
+
+              final faturas = snapshot.data ?? [];
+              if (faturas.isEmpty) {
+                return _cartaoVazio(
+                  context,
+                  icone: Icons.credit_card_outlined,
+                  mensagem: 'Nenhuma fatura neste período.',
+                );
+              }
+
+              return Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < faturas.length; i++) ...[
+                        if (i > 0) ...[
+                          const SizedBox(height: 12),
+                          const Divider(),
+                          const SizedBox(height: 12),
+                        ],
+                        _itemFatura(context, faturas[i]),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
 
           const SizedBox(height: 24),
         ],
       ),
+    );
+  }
+
+  Widget _itemFatura(
+    BuildContext context,
+    FaturaResumoDashboard fatura,
+  ) {
+    final cores = Theme.of(context).colorScheme;
+    final textos = Theme.of(context).textTheme;
+    final situacao = fatura.situacaoPagamento;
+    final corSituacao = situacao == 'PAGA'
+        ? AppTheme.corReceita(context)
+        : situacao == 'PENDENTE'
+            ? AppTheme.corAlerta(context)
+            : cores.onSurfaceVariant;
+    final data = fatura.dataVencimento.split('-');
+    final vencimento = '${data[2]}/${data[1]}/${data[0]}';
+
+    return Row(
+      children: [
+        Icon(Icons.credit_card_outlined, color: cores.onSurfaceVariant),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                fatura.cartaoNome,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textos.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Vencimento: $vencimento',
+                style: textos.bodySmall?.copyWith(
+                  color: cores.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              _formatarMoeda(fatura.valorTotal),
+              style: textos.bodyMedium?.copyWith(
+                color: cores.onSurface,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              situacao == 'PAGA'
+                  ? 'Paga'
+                  : situacao == 'PENDENTE'
+                      ? 'Pendente'
+                      : situacao == 'ABERTA'
+                          ? 'Aberta'
+                          : situacao == 'CANCELADA'
+                              ? 'Cancelada'
+                              : 'Fechada',
+              style: textos.labelSmall?.copyWith(color: corSituacao),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
