@@ -1,4 +1,5 @@
 import '../models/lancamento_model.dart';
+import '../models/categoria_model.dart';
 import '../repositories/lancamento_repository.dart';
 import '../repositories/categoria_repository.dart';
 
@@ -10,6 +11,22 @@ class LancamentoService {
     this._repository, {
     CategoriaRepository? categoriaRepository,
   }) : _categoriaRepository = categoriaRepository ?? CategoriaRepository();
+
+  // Categorias disponiveis para o formulario (inclui categoria inativa
+  // apenas quando ela ja pertence ao lancamento em edicao).
+  Future<List<CategoriaModel>> listarCategoriasFormulario({
+    required String tipo,
+    int? categoriaAtualId,
+  }) async {
+    if (tipo != 'RECEITA' && tipo != 'DESPESA') {
+      throw ArgumentError('Tipo invalido.');
+    }
+    final categorias = await _categoriaRepository.listar();
+    return categorias.where((categoria) =>
+        categoria.tipo == tipo &&
+        (categoria.status == 'ATIVA' ||
+            categoria.id == categoriaAtualId)).toList();
+  }
 
   // Verifica se a data é real e está no formato AAAA-MM-DD.
   void _validarDataPrevista(String data) {
