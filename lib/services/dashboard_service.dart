@@ -23,11 +23,13 @@ class DashboardService {
     if (repository == null) {
       return <FaturaResumoDashboard>[];
     }
-    return repository.listarResumoDashboard(
+    final faturas = await repository.listarResumoDashboard(
       ano: ano,
       mes: mes,
-      limite: limite,
+      limite: 50,
     );
+    if (limite < 1 || limite > 50) throw ArgumentError('Limite inválido.');
+    return faturas.where((f) => f.valorTotal > 0).take(limite).toList();
   }
 
   // Obtém o resumo de um mês específico.
