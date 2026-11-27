@@ -125,7 +125,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Janeiro de ${ano + 1}'), findsOneWidget);
     expect(find.text('Resumo do mês'), findsOneWidget);
-    await tester.pageBack();
+    final detalhe = find.widgetWithText(AppBar, 'Detalhamento mensal');
+    expect(detalhe, findsOneWidget);
+    Navigator.of(tester.element(detalhe)).pop();
     await tester.pumpAndSettle();
     expect(find.text('${ano + 1}'), findsOneWidget);
     final voltar = find.text('Voltar ao ano atual');
