@@ -1,4 +1,6 @@
 import '../models/compra_cartao_model.dart';
+import '../models/cartao_model.dart';
+import '../models/categoria_model.dart';
 import '../repositories/cartao_repository.dart';
 import '../repositories/categoria_repository.dart';
 import '../repositories/compra_cartao_repository.dart';
@@ -31,6 +33,16 @@ class CompraCartaoService {
         convertida.day.toString().padLeft(2, '0') != data.substring(8, 10)) {
       throw ArgumentError('A data da compra é inválida.');
     }
+  }
+
+  Future<List<CartaoModel>> listarCartoesAtivos() async {
+    final cartoes = await _cartaoRepository.listar();
+    return cartoes.where((c) => c.status == 'ATIVO').toList();
+  }
+
+  Future<List<CategoriaModel>> listarCategoriasDespesa() async {
+    final categorias = await _categoriaRepository.listarAtivas();
+    return categorias.where((c) => c.tipo == 'DESPESA').toList();
   }
 
   // Lista as compras cadastradas.

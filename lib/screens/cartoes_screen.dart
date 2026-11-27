@@ -8,17 +8,24 @@ import '../services/cartao_service.dart';
 import '../services/fatura_service.dart';
 import '../theme/app_theme.dart';
 import 'cartao_form_screen.dart';
+import 'compra_cartao_form_screen.dart';
+import '../models/compra_cartao_model.dart';
+import '../repositories/compra_cartao_repository.dart';
+import '../repositories/categoria_repository.dart';
+import '../services/compra_cartao_service.dart';
 
 class CartoesScreen extends StatefulWidget {
   final CartaoService? cartaoService;
   final FaturaService? faturaService;
   final FaturaRepository? faturaRepository;
+  final CompraCartaoService? compraService;
 
   const CartoesScreen({
     super.key,
     this.cartaoService,
     this.faturaService,
     this.faturaRepository,
+    this.compraService,
   });
 
   @override
@@ -27,6 +34,7 @@ class CartoesScreen extends StatefulWidget {
 
 class _CartoesScreenState extends State<CartoesScreen> {
   late final CartaoService _cartaoService;
+  late final CompraCartaoService _compraService;
   late final FaturaService _faturaService;
   late final FaturaRepository _faturaRepository;
   late Future<List<CartaoModel>> _cartoes;
@@ -52,6 +60,11 @@ class _CartoesScreenState extends State<CartoesScreen> {
       _faturaRepository,
       lancamentoRepository: LancamentoRepository(),
       movimentacaoRepository: MovimentacaoRepository(),
+    );
+    _compraService = widget.compraService ?? CompraCartaoService(
+      CompraCartaoRepository(),
+      cartaoRepository: CartaoRepository(),
+      categoriaRepository: CategoriaRepository(),
     );
     _consultar();
   }
@@ -183,6 +196,58 @@ class _CartoesScreenState extends State<CartoesScreen> {
     } finally {
       if (mounted) setState(() => _pagando = false);
     }
+  }
+
+  Future<void> _novaCompra() async {
+    final mudou = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => CompraCartaoFormScreen(service: _compraService),
+      ),
+    );
+    if (mudou == true && mounted) _atualizar();
+  }
+
+  Future<void> _verCompras() async {
+    final compras = _compraService.listarCompras();
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(title: const Text('Compras no cartão')),
+          body: FutureBuilder<List<CompraCartaoModel>>(
+            future: compras,
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return const Center(child: Text('Não foi possível carregar as compras.'));
+              }
+              if (!snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final lista = snapshot.data!;
+              if (lista.isEmpty) {
+                return const Center(child: Text('Nenhuma compra cadastrada.'));
+              }
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: lista.length,
+                itemBuilder: (context, i) {
+                  final compra = lista[i];
+                  return Card(
+                    child: ListTile(
+                      title: Text(compra.descricao),
+                      subtitle: Text(
+                        '${_data(compra.dataCompra)} · ${compra.quantidadeParcelas}x'
+                        ' · ${compra.status == 'ATIVA' ? 'Ativa' : 'Cancelada'}',
+                      ),
+                      trailing: Text(_moeda(compra.valorTotal)),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _abrirFormulario([CartaoModel? cartao]) async {
@@ -356,6 +421,22 @@ class _CartoesScreenState extends State<CartoesScreen> {
                 onPressed: _atualizar,
                 tooltip: 'Atualizar cartões e faturas',
                 icon: const Icon(Icons.refresh),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: _novaCompra,
+                icon: const Icon(Icons.shopping_cart_outlined),
+                label: const Text('Nova compra'),
+              ),
+              OutlinedButton(
+                onPressed: _verCompras,
+                child: const Text('Ver compras'),
               ),
             ],
           ),
