@@ -33,10 +33,12 @@ class MovimentacaoRepository {
   Future<List<MovimentacaoModel>> listar() async {
     final db = await _obterBanco();
 
-    final registros = await db.query(
-      'movimentacao',
-      orderBy: 'data_movimentacao ASC',
-    );
+    final registros = await db.rawQuery("""
+      SELECT m.* FROM movimentacao m
+      JOIN lancamento l ON l.id = m.lancamento_id
+      WHERE l.status = 'EFETIVADO'
+      ORDER BY m.data_movimentacao ASC
+    """);
 
     return registros
         .map((registro) => MovimentacaoModel.fromMap(registro))
