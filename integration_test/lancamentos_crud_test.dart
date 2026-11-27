@@ -119,6 +119,13 @@ void main() {
       await tester.enterText(campos.at(0), 'Internet teste');
       await tester.enterText(campos.at(1), '75,90');
 
+      await tester.ensureVisible(campos.at(2));
+      await tester.tap(campos.at(2));
+      await tester.pumpAndSettle();
+      expect(find.byType(DatePickerDialog), findsOneWidget);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
       // O formulario inicia com a data de hoje e tipo DESPESA.
       await tester.ensureVisible(find.byKey(const ValueKey('categoria-DESPESA')));
       await tester.tap(find.byKey(const ValueKey('categoria-DESPESA')));
