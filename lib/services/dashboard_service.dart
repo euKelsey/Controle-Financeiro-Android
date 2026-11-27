@@ -1,3 +1,4 @@
+import '../repositories/recorrencia_repository.dart';
 import '../repositories/lancamento_repository.dart';
 import '../repositories/fatura_repository.dart';
 import '../models/lancamento_model.dart';
@@ -8,10 +9,12 @@ class DashboardService {
   // Repositorio opcional para permitir os testes antigos do Dashboard
   // com SQLite isolado, sem abrir o banco principal do aplicativo.
   final FaturaRepository? _faturaRepository;
+  final RecorrenciaRepository? recorrencias;
 
   DashboardService(
     this._lancamentoRepository, {
     FaturaRepository? faturaRepository,
+    this.recorrencias,
   }) : _faturaRepository = faturaRepository;
 
   Future<List<FaturaResumoDashboard>> listarFaturasDashboard({
@@ -37,6 +40,9 @@ class DashboardService {
     required int ano,
     required int mes,
   }) async {
+    if (ano >= 1 && ano <= 9999 && mes >= 1 && mes <= 12) {
+      await recorrencias?.gerarAte(DateTime(ano, 12, 31));
+    }
     return _lancamentoRepository.obterResumoMensal(ano: ano, mes: mes);
   }
 
@@ -55,6 +61,9 @@ class DashboardService {
   }) async {
     // Utiliza a data informada ou a data atual.
     final data = dataReferencia ?? DateTime.now();
+    if (data.year >= 1 && data.year < 9999) {
+      await recorrencias?.gerarAte(DateTime(data.year + 1, 12, 31));
+    }
 
     // Converte para o formato utilizado pelo SQLite.
     final dataFormatada =

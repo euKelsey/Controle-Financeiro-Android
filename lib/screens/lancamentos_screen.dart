@@ -1,3 +1,4 @@
+import '../repositories/recorrencia_repository.dart';
 import 'package:flutter/material.dart';
 
 import '../models/lancamento_model.dart';
@@ -46,7 +47,7 @@ class _LancamentosScreenState extends State<LancamentosScreen> {
     final hoje = DateTime.now();
     _ano = hoje.year;
     _mes = hoje.month;
-    _service = widget.service ?? LancamentoService(LancamentoRepository());
+    _service = widget.service ?? LancamentoService(LancamentoRepository(), recorrencias: RecorrenciaRepository());
     _recarregarSemSetState();
   }
 
@@ -159,6 +160,25 @@ class _LancamentosScreenState extends State<LancamentosScreen> {
     }
   }
 
+  Future<void> _encerrar(LancamentoModel lancamento) async {
+    final confirmar = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('Encerrar recorrência?'),
+      content: const Text('Este mês e os seguintes serão cancelados. Os meses anteriores serão preservados.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Voltar')),
+        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Encerrar')),
+      ],
+    ));
+    if (confirmar != true || !mounted) return;
+    try {
+      await _service.encerrarRecorrencia(lancamento.id!);
+      if (mounted) _atualizar();
+    } catch (erro) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Não foi possível encerrar: $erro')));
+    }
+  }
+
   Widget _linha(LancamentoModel lancamento) {
     final cores = Theme.of(context).colorScheme;
     final receita = lancamento.tipo == 'RECEITA';
@@ -190,6 +210,8 @@ class _LancamentosScreenState extends State<LancamentosScreen> {
                     '${_data(lancamento.dataPrevista)} · ${_situacao(lancamento.status)}',
                     style: TextStyle(color: cores.onSurfaceVariant),
                   ),
+                  if (lancamento.origem == 'RECORRENCIA')
+                    const Text('Recorrente · mensal'),
                   if (lancamento.origem == 'FATURA')
                     Text(
                       'Fatura de cartão',
@@ -219,6 +241,8 @@ class _LancamentosScreenState extends State<LancamentosScreen> {
                     onSelected: (acao) {
                       if (acao == 'editar') {
                         _abrirFormulario(lancamento);
+                      } else if (acao == 'encerrar') {
+                        _encerrar(lancamento);
                       } else if (acao == 'cancelar') {
                         _cancelarLancamento(lancamento);
                       }
@@ -226,6 +250,8 @@ class _LancamentosScreenState extends State<LancamentosScreen> {
                     itemBuilder: (_) => [
                       const PopupMenuItem(value: 'editar', child: Text('Editar')),
                       const PopupMenuItem(value: 'cancelar', child: Text('Cancelar')),
+                      if (lancamento.origem == 'RECORRENCIA')
+                        const PopupMenuItem(value: 'encerrar', child: Text('Encerrar recorrência')),
                     ],
                     icon: const Icon(Icons.more_vert),
                   ),

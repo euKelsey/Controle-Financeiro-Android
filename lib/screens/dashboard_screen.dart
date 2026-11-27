@@ -1,3 +1,4 @@
+import '../repositories/recorrencia_repository.dart';
 import 'package:flutter/material.dart';
 
 import '../repositories/lancamento_repository.dart';
@@ -68,6 +69,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         DashboardService(
           LancamentoRepository(),
           faturaRepository: FaturaRepository(),
+          recorrencias: RecorrenciaRepository(),
         );
 
     // Consulta o periodo inicialmente selecionado.
