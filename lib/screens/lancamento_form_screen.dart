@@ -32,6 +32,10 @@ class _LancamentoFormScreenState extends State<LancamentoFormScreen> {
   late Future<List<CategoriaModel>> _categorias;
   int? _categoriaId;
   bool _salvando = false;
+  bool _repetir = false;
+  bool _limitado = false;
+  bool _futuros = false;
+  final _meses = TextEditingController(text: '12');
 
   @override
   void initState() {
@@ -136,7 +140,16 @@ class _LancamentoFormScreenState extends State<LancamentoFormScreen> {
     try {
       final valor = _valorCentavos(_valor.text)!;
       final existente = widget.lancamento;
-      if (existente == null) {
+      if (existente == null && _repetir) {
+        await widget.service.cadastrarRecorrencia(tipo: _tipo, descricao: _descricao.text,
+          valor: valor, categoriaId: _categoriaId!, data: _dataIso(_data.text),
+          quantidadeMeses: _limitado ? int.parse(_meses.text) : null,
+          observacao: _observacao.text.trim());
+      } else if (existente?.origem == 'RECORRENCIA') {
+        await widget.service.editarRecorrencia(id: existente!.id!, tipo: _tipo,
+          descricao: _descricao.text, valor: valor, categoriaId: _categoriaId!,
+          data: _dataIso(_data.text), futuros: _futuros, observacao: _observacao.text.trim());
+      } else if (existente == null) {
         await widget.service.cadastrarLancamento(
           tipo: _tipo,
           descricao: _descricao.text,
@@ -176,6 +189,7 @@ class _LancamentoFormScreenState extends State<LancamentoFormScreen> {
     _valor.dispose();
     _data.dispose();
     _observacao.dispose();
+    _meses.dispose();
     super.dispose();
   }
 
@@ -296,6 +310,31 @@ class _LancamentoFormScreenState extends State<LancamentoFormScreen> {
               ),
               maxLines: 3,
             ),
+            if (!editando) ...[
+              CheckboxListTile(
+                title: const Text('Repetir mensalmente'),
+                value: _repetir,
+                onChanged: _salvando ? null : (v) => setState(() => _repetir = v ?? false),
+              ),
+              if (_repetir) ...[
+                SwitchListTile(title: const Text('Definir quantidade de meses'),
+                  value: _limitado, onChanged: _salvando ? null : (v) => setState(() => _limitado = v)),
+                if (_limitado) TextFormField(
+                  controller: _meses, decoration: const InputDecoration(labelText: 'Quantidade de meses'),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (v) {
+                    final n = int.tryParse(v ?? '');
+                    return n == null || n < 1 || n > 600 ? 'Informe de 1 a 600 meses.' : null;
+                  },
+                ),
+                const Text('O primeiro mês está incluído. As ocorrências são previsões mensais.'),
+              ],
+            ],
+            if (widget.lancamento?.origem == 'RECORRENCIA')
+              CheckboxListTile(title: const Text('Aplicar também aos próximos meses'),
+                subtitle: const Text('A data alterada vale somente para este mês.'),
+                value: _futuros, onChanged: _salvando ? null : (v) => setState(() => _futuros = v ?? false)),
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: _salvando ? null : _salvar,
