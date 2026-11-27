@@ -15,6 +15,27 @@ class CategoriaRepository {
     return _bancoTeste ?? await DatabaseHelper.obterBanco();
   }
 
+  // Inicializa somente um cadastro vazio, sem alterar categorias existentes.
+  Future<void> inicializarPadrao() async {
+    final db = await _obterBanco();
+    await db.transaction((txn) async {
+      final existentes = await txn.query('categoria', columns: ['id'], limit: 1);
+      if (existentes.isNotEmpty) return;
+      const padrao = {
+        'RECEITA': ['Salário', 'Renda extra', 'Outras receitas'],
+        'DESPESA': ['Alimentação', 'Moradia', 'Transporte', 'Saúde',
+          'Educação', 'Internet', 'Energia', 'Lazer', 'Outras despesas'],
+      };
+      for (final grupo in padrao.entries) {
+        for (final nome in grupo.value) {
+          await txn.insert('categoria', {
+            'nome': nome, 'tipo': grupo.key, 'status': 'ATIVA',
+          });
+        }
+      }
+    });
+  }
+
   // Cadastra uma categoria.
   Future<CategoriaModel> inserir(CategoriaModel categoria) async {
     final db = await _obterBanco();
