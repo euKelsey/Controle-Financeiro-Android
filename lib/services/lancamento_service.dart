@@ -1,3 +1,4 @@
+import '../repositories/recorrencia_repository.dart';
 import '../models/lancamento_model.dart';
 import '../models/categoria_model.dart';
 import '../repositories/lancamento_repository.dart';
@@ -6,10 +7,12 @@ import '../repositories/categoria_repository.dart';
 class LancamentoService {
   final LancamentoRepository _repository;
   final CategoriaRepository _categoriaRepository;
+  final RecorrenciaRepository? recorrencias;
 
   LancamentoService(
     this._repository, {
     CategoriaRepository? categoriaRepository,
+    this.recorrencias,
   }) : _categoriaRepository = categoriaRepository ?? CategoriaRepository();
 
   // Categorias disponiveis para o formulario (inclui categoria inativa
@@ -129,6 +132,31 @@ class LancamentoService {
     return registroDireto ? _repository.inserirEfetivado(lancamento) : _repository.inserir(lancamento);
   }
 
+  Future<void> cadastrarRecorrencia({
+    required String tipo, required String descricao, required int valor,
+    required int categoriaId, required String data, int? quantidadeMeses,
+    String? observacao,
+  }) async {
+    _validarDataPrevista(data);
+    await (recorrencias ?? RecorrenciaRepository()).cadastrar(
+      tipo: tipo, descricao: descricao, valor: valor, categoriaId: categoriaId,
+      inicio: DateTime.parse(data), quantidadeMeses: quantidadeMeses, observacao: observacao);
+  }
+
+  Future<void> editarRecorrencia({
+    required int id, required String tipo, required String descricao,
+    required int valor, required int categoriaId, required String data,
+    required bool futuros, String? observacao,
+  }) async {
+    _validarDataPrevista(data);
+    await (recorrencias ?? RecorrenciaRepository()).editarOcorrencia(
+      id: id, tipo: tipo, descricao: descricao, valor: valor, categoriaId: categoriaId,
+      data: DateTime.parse(data), futuros: futuros, observacao: observacao);
+  }
+
+  Future<void> encerrarRecorrencia(int id) =>
+    (recorrencias ?? RecorrenciaRepository()).encerrarDesde(id);
+
   // Lista todos os lançamentos financeiros.
   Future<List<LancamentoModel>> listarLancamentos() async {
     return _repository.listar();
@@ -142,7 +170,10 @@ class LancamentoService {
     String? status,
     int limite = 100,
     int deslocamento = 0,
-  }) {
+  }) async {
+    if (ano >= 1 && ano <= 9999 && mes >= 1 && mes <= 12) {
+      await recorrencias?.gerarAte(DateTime(ano, 12, 31));
+    }
     return _repository.listarPorPeriodo(
       ano: ano,
       mes: mes,
