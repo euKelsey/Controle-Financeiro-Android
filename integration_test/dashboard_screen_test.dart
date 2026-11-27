@@ -14,8 +14,9 @@ import 'package:controle_financeiro_android/theme/app_theme.dart';
 // Restringe a busca aos cartões de resumo, não à lista de vencimentos.
 Finder valorResumo(String valor) => find.descendant(
   of: find.byWidgetPredicate((widget) => widget is Card &&
-      const {ValueKey('resumo-saldo'), ValueKey('resumo-Receitas'),
-        ValueKey('resumo-Despesas')}.contains(widget.key)),
+      (widget.key == const ValueKey('resumo-saldo') ||
+       widget.key == const ValueKey('resumo-Receitas') ||
+       widget.key == const ValueKey('resumo-Despesas'))),
   matching: find.text(valor),
 );
 
