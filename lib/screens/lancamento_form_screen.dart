@@ -104,6 +104,26 @@ class _LancamentoFormScreenState extends State<LancamentoFormScreen> {
     return reais * 100 + centavos;
   }
 
+  Future<void> _selecionarData() async {
+    final partes = _data.text.split('/');
+    final inicial = partes.length == 3
+        ? DateTime.tryParse(partes.reversed.join('-')) : null;
+    final escolhida = await showDatePicker(
+      context: context,
+      initialDate: inicial ?? DateTime.now(),
+      firstDate: DateTime(1),
+      lastDate: DateTime(9999, 12, 31),
+      initialEntryMode: DatePickerEntryMode.calendarOnly,
+    );
+    if (escolhida != null && mounted) {
+      setState(() {
+        _data.text = '${escolhida.day.toString().padLeft(2, '0')}/'
+            '${escolhida.month.toString().padLeft(2, '0')}/'
+            '${escolhida.year.toString().padLeft(4, '0')}';
+      });
+    }
+  }
+
   Future<void> _salvar() async {
     if (_salvando || !_formKey.currentState!.validate()) return;
     if (_categoriaId == null) {
@@ -223,8 +243,10 @@ class _LancamentoFormScreenState extends State<LancamentoFormScreen> {
               decoration: const InputDecoration(
                 labelText: 'Data prevista',
                 hintText: 'DD/MM/AAAA',
+                suffixIcon: Icon(Icons.calendar_today_outlined),
               ),
-              keyboardType: TextInputType.datetime,
+              readOnly: true,
+              onTap: _salvando ? null : _selecionarData,
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'[0-9/]')),
                 LengthLimitingTextInputFormatter(10),
