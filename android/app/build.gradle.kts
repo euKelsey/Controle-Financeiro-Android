@@ -1,7 +1,16 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+val signingPropertiesFile = rootProject.file("key.properties")
+val signingProperties = Properties().apply {
+    if (signingPropertiesFile.isFile) {
+        signingPropertiesFile.inputStream().use { load(it) }
+    }
 }
 
 android {
@@ -29,11 +38,36 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            if (signingPropertiesFile.isFile) {
+                keyAlias = signingProperties.getProperty("keyAlias")
+                keyPassword = signingProperties.getProperty("keyPassword")
+                storeFile = signingProperties.getProperty("storeFile")?.let { rootProject.file(it) }
+                storePassword = signingProperties.getProperty("storePassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
+        }
+    }
+}
+
+tasks.matching { it.name == "validateSigningRelease" }.configureEach {
+    doFirst {
+        check(signingPropertiesFile.isFile) {
+            "Crie android/key.properties para assinar o APK release."
+        }
+        check(listOf("keyAlias", "keyPassword", "storeFile", "storePassword").all {
+            !signingProperties.getProperty(it).isNullOrBlank()
+        }) {
+            "Preencha todos os campos de android/key.properties."
+        }
+        check(rootProject.file(signingProperties.getProperty("storeFile")).isFile) {
+            "Arquivo da chave de assinatura nao encontrado."
         }
     }
 }
