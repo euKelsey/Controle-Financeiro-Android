@@ -4,6 +4,7 @@ import '../models/lancamento_model.dart';
 import '../repositories/lancamento_repository.dart';
 import '../services/lancamento_service.dart';
 import '../theme/app_theme.dart';
+import 'lancamento_form_screen.dart';
 
 class LancamentosScreen extends StatefulWidget {
   final LancamentoService? service;
@@ -101,6 +102,52 @@ class _LancamentosScreenState extends State<LancamentosScreen> {
     }
   }
 
+  Future<void> _abrirFormulario([LancamentoModel? lancamento]) async {
+    final alterado = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => LancamentoFormScreen(
+          service: _service,
+          lancamento: lancamento,
+        ),
+      ),
+    );
+    if (alterado == true && mounted) _atualizar();
+  }
+
+  Future<void> _cancelarLancamento(LancamentoModel lancamento) async {
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancelar lançamento?'),
+        content: Text(
+          'O lançamento "${lancamento.descricao}" será marcado como cancelado. '
+          'O histórico será preservado.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Voltar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Confirmar cancelamento'),
+          ),
+        ],
+      ),
+    );
+    if (confirmado != true || !mounted) return;
+    try {
+      await _service.cancelarLancamento(lancamento.id!);
+      if (mounted) _atualizar();
+    } catch (erro) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Não foi possível cancelar: $erro')),
+        );
+      }
+    }
+  }
+
   Widget _linha(LancamentoModel lancamento) {
     final cores = Theme.of(context).colorScheme;
     final receita = lancamento.tipo == 'RECEITA';
@@ -141,15 +188,37 @@ class _LancamentosScreenState extends State<LancamentosScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              _moeda(lancamento.valorPrevisto),
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: cor,
-                decoration: lancamento.status == 'CANCELADO'
-                    ? TextDecoration.lineThrough
-                    : null,
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  _moeda(lancamento.valorPrevisto),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: cor,
+                    decoration: lancamento.status == 'CANCELADO'
+                        ? TextDecoration.lineThrough
+                        : null,
+                  ),
+                ),
+                if (lancamento.origem != 'FATURA' &&
+                    lancamento.status == 'PENDENTE')
+                  PopupMenuButton<String>(
+                    tooltip: 'Ações de ${lancamento.descricao}',
+                    onSelected: (acao) {
+                      if (acao == 'editar') {
+                        _abrirFormulario(lancamento);
+                      } else if (acao == 'cancelar') {
+                        _cancelarLancamento(lancamento);
+                      }
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(value: 'editar', child: Text('Editar')),
+                      PopupMenuItem(value: 'cancelar', child: Text('Cancelar')),
+                    ],
+                    icon: const Icon(Icons.more_vert),
+                  ),
+              ],
             ),
           ],
         ),
@@ -176,6 +245,11 @@ class _LancamentosScreenState extends State<LancamentosScreen> {
                   'Lançamentos',
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
+              ),
+              IconButton(
+                onPressed: () => _abrirFormulario(),
+                tooltip: 'Novo lançamento',
+                icon: const Icon(Icons.add_circle_outline),
               ),
               IconButton(
                 onPressed: _atualizar,
