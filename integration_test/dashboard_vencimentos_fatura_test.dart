@@ -8,6 +8,7 @@ import 'package:sqflite/sqflite.dart';
 
 import 'package:controle_financeiro_android/repositories/fatura_repository.dart';
 import 'package:controle_financeiro_android/repositories/lancamento_repository.dart';
+import 'package:controle_financeiro_android/repositories/movimentacao_repository.dart';
 import 'package:controle_financeiro_android/screens/dashboard_screen.dart';
 import 'package:controle_financeiro_android/services/dashboard_service.dart';
 import 'package:controle_financeiro_android/services/fatura_service.dart';
@@ -230,6 +231,91 @@ void main() {
           find.text('Farmacia Teste'),
           findsNothing,
         );
+
+        // ETAPA 10: Pagar a fatura pelo Service real.
+        final movimentacaoRepository = MovimentacaoRepository(banco: db);
+        final pagamentoService = FaturaService(
+          faturaRepository,
+          lancamentoRepository: repository,
+          movimentacaoRepository: movimentacaoRepository,
+        );
+
+        final pagamento = await pagamentoService.pagarFatura(
+          faturaId: faturaId,
+          dataPagamento: formatarData(
+            fechamento.add(const Duration(days: 2)),
+          ),
+          forma: ' pix ',
+        );
+
+        expect(pagamento.valor, 34490);
+        expect(pagamento.forma, 'PIX');
+
+        // O lancamento deve permanecer no banco como efetivado.
+        final lancamentoPago = await repository.buscarPorFaturaId(faturaId);
+        expect(lancamentoPago, isNotNull);
+        expect(lancamentoPago!.status, 'EFETIVADO');
+        expect(lancamentoPago.origem, 'FATURA');
+        expect(lancamentoPago.valorPrevisto, 34490);
+
+        // A fatura permanece fechada; pagamento nao apaga historico.
+        final faturaPaga = await pagamentoService.buscarFaturaPorId(faturaId);
+        expect(faturaPaga.status, 'FECHADA');
+
+        // Pagamentos duplicados precisam ser bloqueados.
+        await expectLater(
+          pagamentoService.pagarFatura(
+            faturaId: faturaId,
+            dataPagamento: formatarData(
+              fechamento.add(const Duration(days: 3)),
+            ),
+            forma: 'PIX',
+          ),
+          throwsA(isA<ArgumentError>()),
+        );
+
+        // A lista de vencimentos nao deve conter fatura paga.
+        final aposPagamento = await service.listarProximosVencimentos();
+        expect(aposPagamento, isEmpty);
+
+        // O Dashboard so atualiza sua lista quando solicitado.
+        expect(
+          find.text('Fatura do cartão - $mesReferencia'),
+          findsOneWidget,
+        );
+
+        await tester.tap(
+          find.byTooltip('Atualizar resumo financeiro'),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.text('Fatura do cartão - $mesReferencia'),
+          findsNothing,
+        );
+        expect(
+          find.text('Nenhum vencimento futuro pendente.'),
+          findsOneWidget,
+        );
+
+        // A operacao registra exatamente uma movimentacao.
+        final movimentacoes = await db.query(
+          'movimentacao',
+          where: 'lancamento_id = ?',
+          whereArgs: [lancamentoPago.id],
+        );
+        expect(movimentacoes.length, 1);
+        expect(movimentacoes.single['valor'], 34490);
+
+        // Reprocessar fechamento nao pode duplicar lancamentos.
+        final reprocessamento =
+            await pagamentoService.atualizarFaturasAutomaticamente(
+          dataReferencia: formatarData(
+            fechamento.add(const Duration(days: 3)),
+          ),
+        );
+        expect(reprocessamento.faturasFechadas, 0);
+        expect(reprocessamento.lancamentosGerados, 0);
 
         // ETAPA 10: Conferir os registros.
         final compras = await db.query('compra_cartao');
