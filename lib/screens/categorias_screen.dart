@@ -21,7 +21,10 @@ class _CategoriasScreenState extends State<CategoriasScreen> {
   }
 
   void _atualizar() {
-    setState(() => _categorias = widget.service.listarCategorias());
+    final consulta = widget.service.listarCategorias();
+    setState(() {
+      _categorias = consulta;
+    });
   }
 
   Future<void> _editar([CategoriaModel? categoria]) async {
