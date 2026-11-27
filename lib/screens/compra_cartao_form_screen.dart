@@ -44,6 +44,7 @@ class _CompraCartaoFormScreenState extends State<CompraCartaoFormScreen> {
     if (reais == null || reais > 92233720368547757) return null;
     final centavos = partes.length == 2
         ? int.parse(partes[1].padRight(2, '0')) : 0;
+    if (reais == 92233720368547757 && centavos > 7) return null;
     return reais * 100 + centavos;
   }
 
