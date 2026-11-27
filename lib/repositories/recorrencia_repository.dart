@@ -86,4 +86,72 @@ class RecorrenciaRepository {
     }
     return total;
   }
+
+  Future<void> editarOcorrencia({
+    required int id, required String tipo, required String descricao,
+    required int valor, required int categoriaId, required DateTime data,
+    required bool futuros, String? observacao,
+  }) async {
+    if (valor <= 0 || descricao.trim().isEmpty ||
+        !['RECEITA', 'DESPESA'].contains(tipo)) {
+      throw ArgumentError('Dados inválidos.');
+    }
+    final db = await _db();
+    await db.transaction((txn) async {
+      final rows = await txn.query('lancamento',
+        where: "id = ? AND origem = 'RECORRENCIA' AND status = 'PENDENTE'",
+        whereArgs: [id]);
+      if (rows.length != 1) throw StateError('Ocorrência indisponível.');
+      final atual = rows.single;
+      final antiga = atual['data_prevista'] as String;
+      final nova = iso(data);
+      // A competência é a identidade da ocorrência mensal.
+      if (antiga.substring(0, 7) != nova.substring(0, 7)) {
+        throw ArgumentError('Mantenha a data no mesmo mês da ocorrência.');
+      }
+      final categorias = await txn.query('categoria',
+        where: 'id = ? AND tipo = ?', whereArgs: [categoriaId, tipo]);
+      if (categorias.length != 1 ||
+          (categorias.single['status'] != 'ATIVA' && categoriaId != atual['categoria_id'])) {
+        throw ArgumentError('Categoria inválida.');
+      }
+      final regraId = atual['recorrencia_id'];
+      final campos = <String, Object?>{
+        'tipo': tipo, 'descricao': descricao.trim(), 'valor_previsto': valor,
+        'categoria_id': categoriaId, 'observacao': observacao,
+      };
+      if (futuros) {
+        final regra = (await txn.query('recorrencia', where: 'id = ?', whereArgs: [regraId])).single;
+        if (regra['status'] != 'ATIVA') throw StateError('Recorrência encerrada.');
+        // Não altera o dia de referência dos meses futuros; apenas esta data.
+        await txn.update('recorrencia', {
+          'tipo_lancamento': tipo, 'descricao': descricao.trim(),
+          'valor': valor, 'categoria_id': categoriaId, 'observacao': observacao,
+        }, where: 'id = ?', whereArgs: [regraId]);
+        await txn.update('lancamento', campos,
+          where: "recorrencia_id = ? AND data_prevista > ? AND status = 'PENDENTE'",
+          whereArgs: [regraId, antiga]);
+      }
+      await txn.update('lancamento', {...campos, 'data_prevista': nova},
+        where: 'id = ?', whereArgs: [id]);
+    });
+  }
+
+  Future<void> encerrarDesde(int id) async {
+    final db = await _db();
+    await db.transaction((txn) async {
+      final rows = await txn.query('lancamento',
+        where: "id = ? AND origem = 'RECORRENCIA' AND status = 'PENDENTE'",
+        whereArgs: [id]);
+      if (rows.length != 1) throw StateError('Ocorrência indisponível.');
+      final atual = rows.single;
+      final regraId = atual['recorrencia_id'];
+      await txn.update('recorrencia', {'status': 'ENCERRADA'},
+        where: 'id = ?', whereArgs: [regraId]);
+      await txn.update('lancamento', {'status': 'CANCELADO'},
+        where: "recorrencia_id = ? AND data_prevista >= ? AND status = 'PENDENTE'",
+        whereArgs: [regraId, atual['data_prevista']]);
+    });
+  }
+
 }
