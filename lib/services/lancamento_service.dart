@@ -116,6 +116,25 @@ class LancamentoService {
     return _repository.listar();
   }
 
+  // Consulta de leitura para a tela de lancamentos.
+  Future<List<LancamentoModel>> listarPorPeriodo({
+    required int ano,
+    required int mes,
+    String? tipo,
+    String? status,
+    int limite = 100,
+    int deslocamento = 0,
+  }) {
+    return _repository.listarPorPeriodo(
+      ano: ano,
+      mes: mes,
+      tipo: tipo,
+      status: status,
+      limite: limite,
+      deslocamento: deslocamento,
+    );
+  }
+
   // Busca um lançamento e verifica se ele existe.
   Future<LancamentoModel> buscarLancamentoPorId(int id) async {
     final lancamento = await _repository.buscarPorId(id);
