@@ -275,4 +275,60 @@ class LancamentoRepository {
         .toList();
   }
 
+  // Lista os lancamentos por competencia de vencimento, sem incluir
+  // compras individuais do cartao (apenas o lancamento da fatura).
+  Future<List<LancamentoModel>> listarPorPeriodo({
+    required int ano,
+    required int mes,
+    String? tipo,
+    String? status,
+    int limite = 100,
+    int deslocamento = 0,
+  }) async {
+    if (ano < 1 || ano > 9999 || mes < 1 || mes > 12) {
+      throw ArgumentError('Periodo invalido.');
+    }
+    if (tipo != null && tipo != 'RECEITA' && tipo != 'DESPESA') {
+      throw ArgumentError('Tipo invalido.');
+    }
+    if (status != null &&
+        status != 'PENDENTE' &&
+        status != 'EFETIVADO' &&
+        status != 'CANCELADO') {
+      throw ArgumentError('Status invalido.');
+    }
+    if (limite < 1 || limite > 500 || deslocamento < 0) {
+      throw ArgumentError('Paginacao invalida.');
+    }
+    final inicio =
+        '${ano.toString().padLeft(4, '0')}-${mes.toString().padLeft(2, '0')}-01';
+    // Evita DateTime(9999, 13), que excede o ano maximo aceito.
+    final fim = mes == 12
+        ? '${(ano + 1).toString().padLeft(4, '0')}-01-01'
+        : '${ano.toString().padLeft(4, '0')}-${(mes + 1).toString().padLeft(2, '0')}-01';
+    final condicoes = <String>[
+      'data_prevista >= ?',
+      'data_prevista < ?',
+    ];
+    final argumentos = <Object>[inicio, fim];
+    if (tipo != null) {
+      condicoes.add('tipo = ?');
+      argumentos.add(tipo);
+    }
+    if (status != null) {
+      condicoes.add('status = ?');
+      argumentos.add(status);
+    }
+    final db = await _obterBanco();
+    final registros = await db.query(
+      'lancamento',
+      where: condicoes.join(' AND '),
+      whereArgs: argumentos,
+      orderBy: 'data_prevista DESC, id DESC',
+      limit: limite,
+      offset: deslocamento,
+    );
+    return registros.map(LancamentoModel.fromMap).toList();
+  }
+
 }
