@@ -130,7 +130,8 @@ void main() {
       await tester.ensureVisible(botaoPagar);
       await tester.tap(botaoPagar);
       await tester.pumpAndSettle();
-      expect(find.text('Confirmar pagamento'), findsOneWidget);
+      // O texto aparece no titulo do dialogo e no botao de confirmacao.
+      expect(find.text('Confirmar pagamento'), findsNWidgets(2));
 
       // Nao confirma o pagamento no emulador com data futura simulada.
       // Confirma apenas que a acao exige confirmacao; a integridade e
