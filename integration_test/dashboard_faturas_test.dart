@@ -193,7 +193,11 @@ void main() {
 
       expect(find.text('Cartão Principal UI'), findsOneWidget);
       expect(find.text('Cartão Secundário UI'), findsOneWidget);
-      expect(find.text('R\$ 50,00'), findsOneWidget);
+      // O mesmo valor aparece legitimamente em dois locais:
+      // vencimentos pendentes e faturas do cartao.
+      // A integridade e a quantidade de lancamentos sao verificadas
+      // separadamente no SQLite abaixo.
+      expect(find.text('R\$ 50,00'), findsNWidgets(2));
 
       await faturaService.pagarFatura(
         faturaId: fatura1,
