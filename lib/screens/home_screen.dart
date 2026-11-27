@@ -8,11 +8,19 @@ import '../repositories/fatura_repository.dart';
 import '../services/fatura_service.dart';
 
 class HomeScreen extends StatefulWidget {
+  final FaturaService? faturaService;
+  final DashboardScreen Function(int)? dashboardBuilder;
+  final LancamentosScreen Function(int)? lancamentosBuilder;
+  final CartoesScreen Function(int)? cartoesBuilder;
   final ThemeMode temaAtual;
   final ValueChanged<ThemeMode> onTemaAlterado;
 
   const HomeScreen({
     super.key,
+    this.faturaService,
+    this.dashboardBuilder,
+    this.lancamentosBuilder,
+    this.cartoesBuilder,
     required this.temaAtual,
     required this.onTemaAlterado,
   });
@@ -28,7 +36,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _inicializando = true;
   bool _processando = false;
   String? _erroInicializacao;
-  final _faturas = FaturaService(FaturaRepository());
+  late final _faturas = widget.faturaService ?? FaturaService(FaturaRepository());
 
   @override
   void initState() {
@@ -80,9 +88,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   List<Widget> get _paginas => [
-    DashboardScreen(revisaoDados: _revisaoDados),
-    LancamentosScreen(revisaoDados: _revisaoDados),
-    CartoesScreen(revisaoDados: _revisaoDados),
+    widget.dashboardBuilder?.call(_revisaoDados) ??
+        DashboardScreen(revisaoDados: _revisaoDados),
+    widget.lancamentosBuilder?.call(_revisaoDados) ??
+        LancamentosScreen(revisaoDados: _revisaoDados),
+    widget.cartoesBuilder?.call(_revisaoDados) ??
+        CartoesScreen(revisaoDados: _revisaoDados),
     const MaisScreen(),
   ];
 
