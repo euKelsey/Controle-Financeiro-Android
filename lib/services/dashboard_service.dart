@@ -1,10 +1,34 @@
 import '../repositories/lancamento_repository.dart';
+import '../repositories/fatura_repository.dart';
 import '../models/lancamento_model.dart';
 
 class DashboardService {
   final LancamentoRepository _lancamentoRepository;
 
-  DashboardService(this._lancamentoRepository);
+  // Repositorio opcional para permitir os testes antigos do Dashboard
+  // com SQLite isolado, sem abrir o banco principal do aplicativo.
+  final FaturaRepository? _faturaRepository;
+
+  DashboardService(
+    this._lancamentoRepository, {
+    FaturaRepository? faturaRepository,
+  }) : _faturaRepository = faturaRepository;
+
+  Future<List<FaturaResumoDashboard>> listarFaturasDashboard({
+    required int ano,
+    required int mes,
+    int limite = 5,
+  }) async {
+    final repository = _faturaRepository;
+    if (repository == null) {
+      return <FaturaResumoDashboard>[];
+    }
+    return repository.listarResumoDashboard(
+      ano: ano,
+      mes: mes,
+      limite: limite,
+    );
+  }
 
   // Obtém o resumo de um mês específico.
   Future<({int receitas, int despesas, int saldoPrevisto})> obterResumoMensal({
