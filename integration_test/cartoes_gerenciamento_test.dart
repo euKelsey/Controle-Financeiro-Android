@@ -68,8 +68,19 @@ void main() {
       await tester.enterText(campos.at(0), 'Cartão CRUD');
       await tester.enterText(campos.at(1), 'Banco Teste');
       await tester.enterText(campos.at(2), '3500,90');
-      await tester.enterText(campos.at(3), '10');
-      await tester.enterText(campos.at(4), '20');
+      await tester.ensureVisible(find.byKey(const ValueKey('cartao-fechamento')));
+      await tester.tap(find.byKey(const ValueKey('cartao-fechamento')));
+      await tester.pumpAndSettle();
+      expect(find.byType(DatePickerDialog), findsOneWidget);
+      await tester.tap(find.text('10').last);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.byKey(const ValueKey('cartao-vencimento')));
+      await tester.tap(find.byKey(const ValueKey('cartao-vencimento')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('20').last);
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Salvar cartão'));
       await tester.tap(find.text('Salvar cartão'));
       await tester.pumpAndSettle();
@@ -79,6 +90,8 @@ void main() {
       final id = cadastrados.single.id!;
       expect(cadastrados.single.limiteTotal, 350090);
       expect(cadastrados.single.status, 'ATIVO');
+      expect(cadastrados.single.diaFechamento, 10);
+      expect(cadastrados.single.diaVencimento, 20);
       expect(find.text('Cartão CRUD'), findsOneWidget);
 
       // Registra uma fatura de teste para conferir preservacao historica.
