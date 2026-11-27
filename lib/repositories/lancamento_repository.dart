@@ -337,4 +337,58 @@ class LancamentoRepository {
     return registros.map(LancamentoModel.fromMap).toList();
   }
 
+
+  // Registro simplificado: lançamento e movimentação na mesma transação.
+  Future<LancamentoModel> inserirEfetivado(LancamentoModel lancamento) async {
+    final db = await _obterBanco();
+    return db.transaction((txn) async {
+      final mapa = lancamento.toMap()..['status'] = 'EFETIVADO';
+      final id = await txn.insert('lancamento', mapa);
+      await txn.insert('movimentacao', {
+        'lancamento_id': id, 'valor': lancamento.valorPrevisto,
+        'data_movimentacao': lancamento.dataPrevista, 'forma': 'OUTRO',
+      });
+      return LancamentoModel.fromMap(mapa..['id'] = id);
+    });
+  }
+
+  Future<int> atualizarRegistrado(LancamentoModel lancamento) async {
+    final db = await _obterBanco();
+    return db.transaction((txn) async {
+      final registros = await txn.query('lancamento',
+        where: 'id = ? AND origem = ? AND status IN (?, ?)',
+        whereArgs: [lancamento.id, 'MANUAL', 'PENDENTE', 'EFETIVADO']);
+      if (registros.length != 1) throw StateError('Lançamento indisponível para edição.');
+      final anterior = registros.single;
+      final movimentos = await txn.query('movimentacao',
+        where: 'lancamento_id = ?', whereArgs: [lancamento.id]);
+      if (anterior['status'] == 'EFETIVADO' && movimentos.length != 1) {
+        throw StateError('Movimentação do lançamento inconsistente.');
+      }
+      final mapa = lancamento.toMap()..remove('id');
+      // Não efetiva retroativamente um lançamento pendente legado.
+      mapa['status'] = anterior['status'];
+      final linhas = await txn.update('lancamento', mapa,
+        where: 'id = ?', whereArgs: [lancamento.id]);
+      if (movimentos.isNotEmpty) {
+        final movimento = movimentos.single;
+        await txn.update('movimentacao', {
+          'valor': lancamento.valorPrevisto,
+          if (lancamento.dataPrevista != anterior['data_prevista'])
+            'data_movimentacao': lancamento.dataPrevista,
+        }, where: 'id = ?', whereArgs: [movimento['id']]);
+      }
+      return linhas;
+    });
+  }
+
+  Future<int> cancelarRegistrado(int id) async {
+    final db = await _obterBanco();
+    // Preserva a movimentação histórica; consultas de movimentos ativos
+    // excluem lançamentos cancelados.
+    return db.update('lancamento', {'status': 'CANCELADO'},
+      where: 'id = ? AND origem = ? AND status IN (?, ?)',
+      whereArgs: [id, 'MANUAL', 'PENDENTE', 'EFETIVADO']);
+  }
+
 }

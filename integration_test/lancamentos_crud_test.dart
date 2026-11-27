@@ -142,6 +142,10 @@ void main() {
         1,
       );
 
+      final novo = lancamentos.singleWhere((l) => l.descricao == 'Internet teste');
+      expect(novo.status, 'EFETIVADO');
+      expect((await db.query('movimentacao', where: 'lancamento_id = ?', whereArgs: [novo.id])).single['valor'], 7590);
+
       // Cancelar nao exclui o registro, so altera sua situacao.
       final cancelado = await service.cancelarLancamento(cadastrada.id!);
       expect(cancelado.status, 'CANCELADO');

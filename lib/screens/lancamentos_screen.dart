@@ -4,8 +4,6 @@ import '../models/lancamento_model.dart';
 import '../repositories/lancamento_repository.dart';
 import '../services/lancamento_service.dart';
 import '../services/movimentacao_service.dart';
-import '../repositories/movimentacao_repository.dart';
-import 'movimentacao_form_screen.dart';
 import '../theme/app_theme.dart';
 import 'lancamento_form_screen.dart';
 
@@ -30,7 +28,6 @@ class _LancamentosScreenState extends State<LancamentosScreen> {
   }
 
   late final LancamentoService _service;
-  late final MovimentacaoService _movimentacaoService;
   late Future<List<LancamentoModel>> _lancamentos;
   late int _ano;
   late int _mes;
@@ -50,9 +47,6 @@ class _LancamentosScreenState extends State<LancamentosScreen> {
     _ano = hoje.year;
     _mes = hoje.month;
     _service = widget.service ?? LancamentoService(LancamentoRepository());
-    _movimentacaoService = widget.movimentacaoService ?? MovimentacaoService(
-      MovimentacaoRepository(), lancamentoRepository: LancamentoRepository(),
-    );
     _recarregarSemSetState();
   }
 
@@ -131,18 +125,6 @@ class _LancamentosScreenState extends State<LancamentosScreen> {
     if (alterado == true && mounted) _atualizar();
   }
 
-  Future<void> _efetivar(LancamentoModel lancamento) async {
-    final alterado = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => MovimentacaoFormScreen(
-          service: _movimentacaoService,
-          lancamento: lancamento,
-        ),
-      ),
-    );
-    if (alterado == true && mounted) _atualizar();
-  }
-
   Future<void> _cancelarLancamento(LancamentoModel lancamento) async {
     final confirmado = await showDialog<bool>(
       context: context,
@@ -166,7 +148,7 @@ class _LancamentosScreenState extends State<LancamentosScreen> {
     );
     if (confirmado != true || !mounted) return;
     try {
-      await _service.cancelarLancamento(lancamento.id!);
+      await _service.cancelarLancamento(lancamento.id!, registroDireto: true);
       if (mounted) _atualizar();
     } catch (erro) {
       if (mounted) {
@@ -231,23 +213,17 @@ class _LancamentosScreenState extends State<LancamentosScreen> {
                   ),
                 ),
                 if (lancamento.origem != 'FATURA' &&
-                    lancamento.status == 'PENDENTE')
+                    (lancamento.status == 'PENDENTE' || (lancamento.origem == 'MANUAL' && lancamento.status == 'EFETIVADO')))
                   PopupMenuButton<String>(
                     tooltip: 'Ações de ${lancamento.descricao}',
                     onSelected: (acao) {
-                      if (acao == 'efetivar') {
-                        _efetivar(lancamento);
-                      } else if (acao == 'editar') {
+                      if (acao == 'editar') {
                         _abrirFormulario(lancamento);
                       } else if (acao == 'cancelar') {
                         _cancelarLancamento(lancamento);
                       }
                     },
                     itemBuilder: (_) => [
-                      PopupMenuItem(
-                        value: 'efetivar',
-                        child: Text(receita ? 'Registrar recebimento' : 'Registrar pagamento'),
-                      ),
                       const PopupMenuItem(value: 'editar', child: Text('Editar')),
                       const PopupMenuItem(value: 'cancelar', child: Text('Cancelar')),
                     ],

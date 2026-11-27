@@ -124,6 +124,7 @@ class _LancamentoFormScreenState extends State<LancamentoFormScreen> {
           dataPrevista: _dataIso(_data.text),
           categoriaId: _categoriaId,
           observacao: _observacao.text.trim(),
+          registroDireto: true,
         );
       } else {
         await widget.service.atualizarLancamento(
@@ -134,6 +135,7 @@ class _LancamentoFormScreenState extends State<LancamentoFormScreen> {
           dataPrevista: _dataIso(_data.text),
           categoriaId: _categoriaId,
           observacao: _observacao.text.trim(),
+          registroDireto: true,
         );
       }
       if (mounted) Navigator.of(context).pop(true);
