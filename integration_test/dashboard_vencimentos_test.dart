@@ -76,7 +76,7 @@ void main() {
         final referencia = DateTime(
           hoje.year,
           hoje.month,
-          hoje.day,
+          10,
         );
 
         final amanha = referencia.add(
@@ -180,19 +180,22 @@ void main() {
         // A secao fica abaixo dos cartoes do resumo.
         // Rolamos ate seu titulo.
         await tester.ensureVisible(
-          find.text('Próximos vencimentos'),
+          find.text('Vencimentos do mês'),
         );
 
         await tester.pumpAndSettle();
 
+        final secao = find.ancestor(of: find.text('Vence em ${formatarDataVisual(referencia)}'), matching: find.byType(Card)).first;
+        Finder naSecao(String texto) => find.descendant(of: secao, matching: find.text(texto));
+
         // TESTE 1: Conferir a despesa pendente.
         expect(
-          find.text('Energia Teste UI'),
+          naSecao('Energia Teste UI'),
           findsOneWidget,
         );
 
         expect(
-          find.text('R\$ 185,00'),
+          naSecao('R\$ 185,00'),
           findsOneWidget,
         );
 
@@ -205,24 +208,24 @@ void main() {
 
         // TESTE 2: Conferir receita pendente.
         expect(
-          find.text('Recebimento Teste UI'),
+          naSecao('Recebimento Teste UI'),
           findsOneWidget,
         );
 
         expect(
-          find.text('R\$ 950,00'),
-          findsNWidgets(2),
+          naSecao('R\$ 950,00'),
+          findsOneWidget,
         );
 
         // TESTE 3: Lancamentos nao pendentes
         // nao devem ser exibidos na lista.
         expect(
-          find.text('Despesa Efetivada UI'),
+          naSecao('Despesa Efetivada UI'),
           findsNothing,
         );
 
         expect(
-          find.text('Despesa Cancelada UI'),
+          naSecao('Despesa Cancelada UI'),
           findsNothing,
         );
 
@@ -238,11 +241,13 @@ void main() {
         // TESTE 4: O novo registro ainda
         // nao aparece sem atualizar a tela.
         expect(
-          find.text('Internet Nova UI'),
+          naSecao('Internet Nova UI'),
           findsNothing,
         );
 
         // ETAPA 8: Atualizar pelo botao.
+        await tester.ensureVisible(find.byTooltip('Atualizar resumo financeiro'));
+        await tester.pumpAndSettle();
         await tester.tap(
           find.byTooltip('Atualizar resumo financeiro'),
         );
@@ -251,12 +256,12 @@ void main() {
 
         // TESTE 5: Conferir o novo vencimento.
         expect(
-          find.text('Internet Nova UI'),
+          naSecao('Internet Nova UI'),
           findsOneWidget,
         );
 
         expect(
-          find.text('R\$ 120,00'),
+          naSecao('R\$ 120,00'),
           findsOneWidget,
         );
 
