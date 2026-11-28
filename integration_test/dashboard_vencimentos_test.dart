@@ -246,12 +246,23 @@ void main() {
         );
 
         // ETAPA 8: Atualizar pelo botao.
-        await tester.ensureVisible(find.byTooltip('Atualizar resumo financeiro'));
+        await tester.dragUntilVisible(
+          find.byTooltip('Atualizar resumo financeiro').hitTestable(),
+          find.byType(ListView),
+          const Offset(0, 250),
+        );
         await tester.pumpAndSettle();
         await tester.tap(
           find.byTooltip('Atualizar resumo financeiro'),
         );
 
+        await tester.pumpAndSettle();
+
+        await tester.dragUntilVisible(
+          find.text('Vencimentos do mês').hitTestable(),
+          find.byType(ListView),
+          const Offset(0, -200),
+        );
         await tester.pumpAndSettle();
 
         // TESTE 5: Conferir o novo vencimento.
