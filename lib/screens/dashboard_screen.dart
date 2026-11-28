@@ -84,7 +84,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _resumo = _consultarPeriodoSelecionado();
 
     // Carrega os proximos vencimentos a partir de hoje.
-    _vencimentos = _service.listarProximosVencimentos();
+    _vencimentos = _consultarVencimentos();
     _faturas = _consultarFaturasSelecionadas();
       _lancamentosMes = _service.listarLancamentosMes(ano: _anoSelecionado, mes: _mesSelecionado);
   }
@@ -97,6 +97,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       mes: _mesSelecionado,
     );
   }
+
+  Future<List<LancamentoModel>> _consultarVencimentos() =>
+      _service.listarVencimentosMes(ano: _anoSelecionado, mes: _mesSelecionado);
 
   // Faturas acompanham o periodo selecionado no resumo.
   Future<List<FaturaResumoDashboard>> _consultarFaturasSelecionadas() {
@@ -114,7 +117,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
 
     // Respeita o intervalo aceito pelo Repository.
-    if (novoPeriodo.year < 1 || novoPeriodo.year > 9999) {
+    if (novoPeriodo.year < 1 || novoPeriodo.year > 9998) {
       return;
     }
 
@@ -124,6 +127,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       // Recarrega os valores do novo periodo.
       _resumo = _consultarPeriodoSelecionado();
+      _vencimentos = _consultarVencimentos();
       _faturas = _consultarFaturasSelecionadas();
       _lancamentosMes = _service.listarLancamentosMes(ano: _anoSelecionado, mes: _mesSelecionado);
     });
@@ -139,6 +143,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       // Atualiza o resumo e as faturas do mes atual.
       _resumo = _consultarPeriodoSelecionado();
+      _vencimentos = _consultarVencimentos();
       _faturas = _consultarFaturasSelecionadas();
       _lancamentosMes = _service.listarLancamentosMes(ano: _anoSelecionado, mes: _mesSelecionado);
     });
@@ -149,7 +154,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() {
       _resumo = _consultarPeriodoSelecionado();
 
-      _vencimentos = _service.listarProximosVencimentos();
+      _vencimentos = _consultarVencimentos();
       _faturas = _consultarFaturasSelecionadas();
       _lancamentosMes = _service.listarLancamentosMes(ano: _anoSelecionado, mes: _mesSelecionado);
     });
@@ -159,7 +164,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _atualizarPorGesto() async {
     final novaConsulta = _consultarPeriodoSelecionado();
 
-    final novosVencimentos = _service.listarProximosVencimentos();
+    final novosVencimentos = _consultarVencimentos();
     final novasFaturas = _consultarFaturasSelecionadas();
 
     setState(() {
@@ -364,7 +369,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
               final corSaldo = resumo.saldoPrevisto < 0
                   ? AppTheme.corDespesa(context)
-                  : cores.onSurface;
+                  : resumo.saldoPrevisto > 0
+                      ? AppTheme.corReceita(context)
+                      : cores.onSurface;
 
               return Column(
                 children: [
@@ -453,7 +460,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           _tituloSecao(
             context,
-            titulo: 'Próximos vencimentos',
+            titulo: 'Vencimentos do mês',
             icone: Icons.event_outlined,
           ),
 
@@ -508,7 +515,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 return _cartaoVazio(
                   context,
                   icone: Icons.event_available_outlined,
-                  mensagem: 'Nenhum vencimento futuro pendente.',
+                  mensagem: 'Nenhum vencimento pendente neste mês.',
                 );
               }
 
