@@ -1,3 +1,4 @@
+import 'dashboard_anual_view.dart';
 import '../repositories/recorrencia_repository.dart';
 import 'package:flutter/material.dart';
 
@@ -10,8 +11,12 @@ import '../models/lancamento_model.dart';
 class DashboardScreen extends StatefulWidget {
   final int revisaoDados;
   final DashboardService? service;
+  final bool iniciarAnual;
+  final int? anoInicial;
+  final int? mesInicial;
 
-  const DashboardScreen({super.key, this.service, this.revisaoDados = 0});
+  const DashboardScreen({super.key, this.service, this.revisaoDados = 0,
+    this.iniciarAnual = false, this.anoInicial, this.mesInicial});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -22,7 +27,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void didUpdateWidget(covariant DashboardScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.revisaoDados != widget.revisaoDados) {
-      _atualizarResumo();
+      if (!widget.iniciarAnual) _atualizarResumo();
     }
   }
 
@@ -33,6 +38,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Armazena a consulta dos proximos vencimentos.
   late Future<List<LancamentoModel>> _vencimentos;
   late Future<List<FaturaResumoDashboard>> _faturas;
+  late Future<List<LancamentoModel>> _lancamentosMes;
 
   // Periodo selecionado no Dashboard.
   late int _anoSelecionado;
@@ -61,8 +67,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // Identifica o mes e ano atuais do aparelho.
     final hoje = DateTime.now();
 
-    _anoSelecionado = hoje.year;
-    _mesSelecionado = hoje.month;
+    _anoSelecionado = widget.anoInicial ?? hoje.year;
+    _mesSelecionado = widget.mesInicial ?? hoje.month;
 
     // Configura o Service principal ou o de testes.
     _service = widget.service ??
@@ -72,12 +78,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
           recorrencias: RecorrenciaRepository(),
         );
 
+    if (widget.iniciarAnual) return;
+
     // Consulta o periodo inicialmente selecionado.
     _resumo = _consultarPeriodoSelecionado();
 
     // Carrega os proximos vencimentos a partir de hoje.
     _vencimentos = _service.listarProximosVencimentos();
     _faturas = _consultarFaturasSelecionadas();
+      _lancamentosMes = _service.listarLancamentosMes(ano: _anoSelecionado, mes: _mesSelecionado);
   }
 
   // Consulta os valores do periodo selecionado.
@@ -116,6 +125,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Recarrega os valores do novo periodo.
       _resumo = _consultarPeriodoSelecionado();
       _faturas = _consultarFaturasSelecionadas();
+      _lancamentosMes = _service.listarLancamentosMes(ano: _anoSelecionado, mes: _mesSelecionado);
     });
   }
 
@@ -130,6 +140,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // Atualiza o resumo e as faturas do mes atual.
       _resumo = _consultarPeriodoSelecionado();
       _faturas = _consultarFaturasSelecionadas();
+      _lancamentosMes = _service.listarLancamentosMes(ano: _anoSelecionado, mes: _mesSelecionado);
     });
   }
 
@@ -140,6 +151,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       _vencimentos = _service.listarProximosVencimentos();
       _faturas = _consultarFaturasSelecionadas();
+      _lancamentosMes = _service.listarLancamentosMes(ano: _anoSelecionado, mes: _mesSelecionado);
     });
   }
 
@@ -154,11 +166,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _resumo = novaConsulta;
       _vencimentos = novosVencimentos;
       _faturas = novasFaturas;
+      _lancamentosMes = _service.listarLancamentosMes(ano: _anoSelecionado, mes: _mesSelecionado);
     });
 
     try {
       // Aguarda as tres consultas terminarem.
-      await Future.wait([novaConsulta, novosVencimentos, novasFaturas]);
+      await Future.wait([novaConsulta, novosVencimentos, novasFaturas, _lancamentosMes]);
     } catch (erro) {
       // Cada FutureBuilder apresentara seu erro.
       debugPrint('Erro ao atualizar Dashboard: $erro');
@@ -186,6 +199,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.iniciarAnual) {
+      return DashboardAnualView(service: _service, revisaoDados: widget.revisaoDados);
+    }
     final cores = Theme.of(context).colorScheme;
     final textos = Theme.of(context).textTheme;
 
@@ -576,6 +592,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
             },
           ),
 
+          const SizedBox(height: 28),
+          _tituloSecao(context, titulo: 'Lançamentos do mês', icone: Icons.receipt_long_outlined),
+          const SizedBox(height: 12),
+          FutureBuilder<List<LancamentoModel>>(
+            future: _lancamentosMes,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return const Text('Não foi possível carregar os lançamentos.');
+              }
+              final lista = snapshot.data ?? [];
+              if (lista.isEmpty) return _cartaoVazio(context,
+                icone: Icons.receipt_long_outlined, mensagem: 'Nenhum lançamento neste mês.');
+              return Card(child: Column(children: [
+                for (final l in lista)
+                  ListTile(
+                    title: Text(l.descricao),
+                    subtitle: Text(l.dataPrevista.split('-').reversed.join('/') +
+                      (l.origem == 'RECORRENCIA' ? ' · Recorrente' : '')),
+                    trailing: Text(_formatarMoeda(l.valorPrevisto),
+                      style: TextStyle(color: l.tipo == 'RECEITA'
+                        ? AppTheme.corReceita(context) : AppTheme.corDespesa(context))),
+                  ),
+              ]));
+            },
+          ),
           const SizedBox(height: 24),
         ],
       ),

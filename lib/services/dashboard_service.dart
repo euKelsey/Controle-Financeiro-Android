@@ -35,6 +35,35 @@ class DashboardService {
     return faturas.where((f) => f.valorTotal > 0).take(limite).toList();
   }
 
+  // Gera as recorrências uma vez e usa a mesma regra mensal para os 12 meses.
+  Future<List<({int receitas, int despesas, int saldoPrevisto})>> obterResumoAnual({
+    required int ano,
+  }) async {
+    if (ano < 1 || ano > 9998) throw ArgumentError('Ano inválido.');
+    await recorrencias?.gerarAte(DateTime(ano, 12, 31));
+    final resultado = <({int receitas, int despesas, int saldoPrevisto})>[];
+    for (var mes = 1; mes <= 12; mes++) {
+      resultado.add(await _lancamentoRepository.obterResumoMensal(ano: ano, mes: mes));
+    }
+    return resultado;
+  }
+
+  // Lista os lançamentos da data prevista no mês, exceto faturas,
+  // que possuem sua própria seção por competência.
+  Future<List<LancamentoModel>> listarLancamentosMes({
+    required int ano, required int mes,
+  }) async {
+    await recorrencias?.gerarAte(DateTime(ano, 12, 31));
+    final resultado = <LancamentoModel>[];
+    for (var offset = 0; ; offset += 100) {
+      final pagina = await _lancamentoRepository.listarPorPeriodo(
+        ano: ano, mes: mes, limite: 100, deslocamento: offset);
+      resultado.addAll(pagina.where((l) => l.origem != 'FATURA' && l.status != 'CANCELADO'));
+      if (pagina.length < 100) break;
+    }
+    return resultado;
+  }
+
   // Obtém o resumo de um mês específico.
   Future<({int receitas, int despesas, int saldoPrevisto})> obterResumoMensal({
     required int ano,
