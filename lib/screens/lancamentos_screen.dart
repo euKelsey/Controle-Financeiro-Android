@@ -207,7 +207,7 @@ class _LancamentosScreenState extends State<LancamentosScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${_data(lancamento.dataPrevista)} · ${_situacao(lancamento.status)}',
+                    '${_data(lancamento.dataPrevista)} · ${lancamento.origem == 'RECORRENCIA' && lancamento.status == 'PENDENTE' ? 'Previsto' : _situacao(lancamento.status)}',
                     style: TextStyle(color: cores.onSurfaceVariant),
                   ),
                   if (lancamento.origem == 'RECORRENCIA')
