@@ -775,7 +775,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Pendente',
+              lancamento.origem == 'RECORRENCIA' ? 'Previsto' : 'Pendente',
               style: textos.labelSmall?.copyWith(
                 color: AppTheme.corAlerta(context),
               ),
