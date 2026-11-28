@@ -71,7 +71,7 @@ void main() {
       );
 
       // TESTE 3: Inserir movimentação.
-      final primeira = await repository.inserir(
+      final primeira = await repository.inserirEEfetivar(
         MovimentacaoModel(
           lancamentoId: primeiroLancamentoId,
           valor: 18590,
@@ -113,7 +113,7 @@ void main() {
       );
 
       // TESTE 6: Inserir segunda movimentação.
-      final segunda = await repository.inserir(
+      final segunda = await repository.inserirEEfetivar(
         MovimentacaoModel(
           lancamentoId: segundoLancamentoId,
           valor: 12000,
@@ -123,6 +123,8 @@ void main() {
       );
 
       expect(segunda.id, isNotNull);
+      final efetivados = await db.query('lancamento', where: 'status = ?', whereArgs: ['EFETIVADO']);
+      expect(efetivados.length, 2);
 
       // TESTE 7: Listagem ordenada pela data.
       final movimentacoes = await repository.listar();
@@ -159,6 +161,11 @@ void main() {
       final registros = await db.query('movimentacao');
 
       expect(registros.length, 2);
+
+      // Cancelamento mantém histórico, mas exclui da lista efetivada.
+      await db.update('lancamento', {'status': 'CANCELADO'}, where: 'id = ?', whereArgs: [primeiroLancamentoId]);
+      expect((await repository.listar()).map((m) => m.id), [segunda.id]);
+      expect(await repository.buscarPorId(primeira.id!), isNotNull);
 
       // TESTE 11: Verificar integridade referencial.
       final integridade = await db.rawQuery(

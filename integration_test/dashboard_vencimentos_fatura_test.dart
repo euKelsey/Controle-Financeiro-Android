@@ -201,7 +201,7 @@ void main() {
           MaterialApp(
             theme: AppTheme.temaClaro,
             home: Scaffold(
-              body: DashboardScreen(service: service),
+              body: DashboardScreen(service: service, anoInicial: mesFatura.year, mesInicial: mesFatura.month),
             ),
           ),
         );
@@ -218,7 +218,7 @@ void main() {
 
         expect(
           find.text('R\$ 344,90'),
-          findsOneWidget,
+          findsNWidgets(2),
         );
 
         // As compras nao aparecem individualmente.
@@ -294,7 +294,7 @@ void main() {
           findsNothing,
         );
         expect(
-          find.text('Nenhum vencimento futuro pendente.'),
+          find.text('Nenhum vencimento pendente neste mês.'),
           findsOneWidget,
         );
 
