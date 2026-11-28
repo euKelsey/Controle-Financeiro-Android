@@ -16,6 +16,7 @@ class DashboardAnualView extends StatefulWidget {
 
 class _DashboardAnualViewState extends State<DashboardAnualView> {
   static const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  int? _mesGrafico;
   late int _ano;
   late Future<List<ResumoMes>> _consulta;
 
@@ -43,6 +44,7 @@ class _DashboardAnualViewState extends State<DashboardAnualView> {
     if (ano < 1 || ano > 9998) return;
     setState(() {
       _ano = ano;
+      _mesGrafico = null;
       _consulta = widget.service.obterResumoAnual(ano: _ano);
     });
   }
@@ -143,9 +145,32 @@ class _DashboardAnualViewState extends State<DashboardAnualView> {
                     const SizedBox(width: 18), Icon(Icons.square, size: 12, color: despesa), const SizedBox(width: 4), const Text('Despesas'),
                   ]),
                   const SizedBox(height: 12),
-                  SizedBox(height: 150, width: double.infinity, child: CustomPaint(
-                    painter: _GraficoAnual(dados, receita, despesa, cores.onSurfaceVariant, cores.outlineVariant),
-                  )),
+                  LayoutBuilder(builder: (context, c) {
+                    return GestureDetector(
+                      key: const ValueKey('grafico-anual'),
+                      behavior: HitTestBehavior.opaque,
+                      onTapUp: (evento) {
+                        final largura = c.maxWidth - _GraficoAnual.margem;
+                        if (largura <= 0 || evento.localPosition.dx < _GraficoAnual.margem) return;
+                        final i = ((evento.localPosition.dx - _GraficoAnual.margem) / largura * 12).floor().clamp(0, 11).toInt();
+                        setState(() => _mesGrafico = i);
+                      },
+                      child: SizedBox(height: 150, width: double.infinity, child: CustomPaint(
+                        painter: _GraficoAnual(dados, receita, despesa, cores.onSurfaceVariant, cores.outlineVariant, _mesGrafico),
+                      )),
+                    );
+                  }),
+                  if (_mesGrafico != null) ...[
+                    const Divider(),
+                    Text('${meses[_mesGrafico!]} de $_ano', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Row(children: [
+                      Expanded(child: _valor('Receitas', dados[_mesGrafico!].receitas, receita, chave: 'grafico-receitas')),
+                      const SizedBox(width: 8),
+                      Expanded(child: _valor('Despesas', dados[_mesGrafico!].despesas, despesa, chave: 'grafico-despesas')),
+                    ]),
+                  ] else
+                    const Text('Toque no gráfico para consultar os valores.', style: TextStyle(fontSize: 11)),
                 ],
               ))),
               const SizedBox(height: 18),
@@ -167,8 +192,8 @@ class _DashboardAnualViewState extends State<DashboardAnualView> {
                         child: Padding(padding: const EdgeInsets.all(10), child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start, children: [
                             Row(children: [Expanded(child: Text(meses[i])), const Icon(Icons.chevron_right, size: 16)]),
-                            if (_ano == hoje.year && i+1 == hoje.month)
-                              const Text('Atual', style: TextStyle(fontSize: 10)),
+                            Text(_ano == hoje.year && i+1 == hoje.month ? 'Atual' : ' ',
+                              style: const TextStyle(fontSize: 10)),
                             const SizedBox(height: 6),
                             FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft,
                               child: Text(_moeda(dados[i].saldoPrevisto),
@@ -192,7 +217,9 @@ class _DashboardAnualViewState extends State<DashboardAnualView> {
 class _GraficoAnual extends CustomPainter {
   final List<ResumoMes> dados;
   final Color receita, despesa, texto, linha;
-  _GraficoAnual(this.dados, this.receita, this.despesa, this.texto, this.linha);
+  static const double margem = 45;
+  final int? selecionado;
+  _GraficoAnual(this.dados, this.receita, this.despesa, this.texto, this.linha, this.selecionado);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -201,30 +228,41 @@ class _GraficoAnual extends CustomPainter {
       final maior = v.receitas > v.despesas ? v.receitas : v.despesas;
       return maior > m ? maior : m;
     });
-    final escala = maximo == 0 ? 1 : maximo;
+    // Arredonda o teto para quatro intervalos legíveis, em centavos.
+    var unidade = 100;
+    while (maximo > unidade * 40) { unidade *= 10; }
+    final intervalo = maximo == 0 ? 2500 : ((maximo / (4 * unidade)).ceil() * unidade);
+    final escala = intervalo * 4;
     final base = size.height - 22;
     final altura = base - 10;
-    final passo = size.width / 12;
+    final passo = (size.width - margem) / 12;
     final w = passo * .30;
     final paint = Paint();
     for (var i = 0; i <= 4; i++) {
       final y = base - altura*i/4;
-      canvas.drawLine(Offset(0,y), Offset(size.width,y), paint..color = linha..strokeWidth = 1);
+      canvas.drawLine(Offset(margem,y), Offset(size.width,y), paint..color = linha..strokeWidth = 1);
+      final reais = intervalo*i/100;
+      final rotulo = reais >= 1000 ? '${(reais/1000).toStringAsFixed(reais % 1000 == 0 ? 0 : 1).replaceAll('.', ',')} mil' : reais.toStringAsFixed(0);
+      final tp = TextPainter(text: TextSpan(text: rotulo, style: TextStyle(fontSize: 8, color: texto)), textDirection: TextDirection.ltr)..layout(maxWidth: margem-4);
+      tp.paint(canvas, Offset(margem-4-tp.width, y-tp.height/2));
     }
     for (var i=0; i<12; i++) {
-      final x = i*passo + passo*.15;
+      final x = margem + i*passo + passo*.15;
+      if (selecionado == i) {
+        canvas.drawRect(Rect.fromLTWH(margem+i*passo, 0, passo, base), paint..color=texto.withValues(alpha:.10));
+      }
       final hr = dados[i].receitas/escala*altura;
       final hd = dados[i].despesas/escala*altura;
       canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(x,base-hr,w,hr),const Radius.circular(2)),paint..color=receita);
       canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(x+w+2,base-hd,w,hd),const Radius.circular(2)),paint..color=despesa);
       final tp = TextPainter(text: TextSpan(text: _DashboardAnualViewState.meses[i],
         style: TextStyle(fontSize: 9,color:texto)), textDirection: TextDirection.ltr)..layout();
-      tp.paint(canvas,Offset(i*passo+(passo-tp.width)/2,base+6));
+      tp.paint(canvas,Offset(margem+i*passo+(passo-tp.width)/2,base+6));
     }
   }
 
   @override
   bool shouldRepaint(covariant _GraficoAnual oldDelegate) =>
-      oldDelegate.dados != dados || oldDelegate.receita != receita ||
+      oldDelegate.selecionado != selecionado || oldDelegate.dados != dados || oldDelegate.receita != receita ||
       oldDelegate.despesa != despesa || oldDelegate.texto != texto || oldDelegate.linha != linha;
 }

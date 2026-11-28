@@ -83,6 +83,22 @@ class DashboardService {
     return obterResumoMensal(ano: hoje.year, mes: hoje.month);
   }
 
+  // Vencimentos pela data de pagamento, não pela competência da fatura.
+  // Inclui os pendentes do mês inteiro, inclusive os já vencidos.
+  Future<List<LancamentoModel>> listarVencimentosMes({
+    required int ano, required int mes, int limite = 5,
+  }) async {
+    if (ano < 1 || ano > 9998 || mes < 1 || mes > 12 || limite < 1 || limite > 50) {
+      throw ArgumentError('Período ou limite inválido.');
+    }
+    await recorrencias?.gerarAte(DateTime(ano, 12, 31));
+    final inicio = RecorrenciaRepository.iso(DateTime(ano, mes, 1));
+    final fim = RecorrenciaRepository.iso(DateTime(ano, mes+1, 1));
+    final lista = await _lancamentoRepository.listarProximosVencimentos(
+      dataReferencia: inicio, limite: limite);
+    return lista.where((l) => l.dataPrevista.compareTo(fim) < 0).toList();
+  }
+
   // Consulta os proximos vencimentos pendentes.
   Future<List<LancamentoModel>> listarProximosVencimentos({
     DateTime? dataReferencia,

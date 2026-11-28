@@ -73,6 +73,17 @@ void main() {
         body: DashboardScreen(service: service, iniciarAnual: true))));
       await tester.pumpAndSettle();
       expect(tester.widget<Text>(find.byKey(const ValueKey('saldo-anual'))).data, 'R\$ 41.600,00');
+      final vencimentos = await service.listarVencimentosMes(ano: ano, mes: 7);
+      expect(vencimentos.length, 2);
+      expect(vencimentos.every((l) => l.dataPrevista.startsWith('$ano-07-')), isTrue);
+      final grafico = find.byKey(const ValueKey('grafico-anual'));
+      await tester.ensureVisible(grafico);
+      await tester.pumpAndSettle();
+      final area = tester.getRect(grafico);
+      await tester.tapAt(Offset(area.right - 5, area.center.dy));
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(find.byKey(const ValueKey('grafico-receitas'))).data, 'R\$ 5.000,00');
+      expect(tester.widget<Text>(find.byKey(const ValueKey('grafico-despesas'))).data, 'R\$ 1.900,00');
       final dezembro = find.byKey(const ValueKey('mes-12'));
       await tester.ensureVisible(dezembro);
       await tester.tap(dezembro);
