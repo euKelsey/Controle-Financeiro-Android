@@ -71,7 +71,7 @@ void main() {
       );
 
       // TESTE 3: Inserir movimentação.
-      final primeira = await repository.inserir(
+      final primeira = await repository.inserirEEfetivar(
         MovimentacaoModel(
           lancamentoId: primeiroLancamentoId,
           valor: 18590,
@@ -159,6 +159,11 @@ void main() {
       final registros = await db.query('movimentacao');
 
       expect(registros.length, 2);
+
+      // Cancelamento mantém histórico, mas exclui da lista efetivada.
+      await db.update('lancamento', {'status': 'CANCELADO'}, where: 'id = ?', whereArgs: [primeiroLancamentoId]);
+      expect((await repository.listar()).map((m) => m.id), [segunda.id]);
+      expect(await repository.buscarPorId(primeira.id!), isNotNull);
 
       // TESTE 11: Verificar integridade referencial.
       final integridade = await db.rawQuery(
