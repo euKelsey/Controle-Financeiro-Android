@@ -113,7 +113,7 @@ void main() {
       );
 
       // TESTE 6: Inserir segunda movimentação.
-      final segunda = await repository.inserir(
+      final segunda = await repository.inserirEEfetivar(
         MovimentacaoModel(
           lancamentoId: segundoLancamentoId,
           valor: 12000,
@@ -123,6 +123,8 @@ void main() {
       );
 
       expect(segunda.id, isNotNull);
+      final efetivados = await db.query('lancamento', where: 'status = ?', whereArgs: ['EFETIVADO']);
+      expect(efetivados.length, 2);
 
       // TESTE 7: Listagem ordenada pela data.
       final movimentacoes = await repository.listar();
